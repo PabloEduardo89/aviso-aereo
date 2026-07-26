@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aviso Aéreo</title>
+<style>
+  :root{
+    --bg: #0B1220;
+    --panel: #131C2E;
+    --panel-2: #1B2740;
+    --amber: #F2A93B;
+    --amber-dim: #7A5A25;
+    --text: #E8ECF4;
+    --muted: #7C8AA5;
+    --green: #4ADE80;
+    --red: #F2665A;
+    --line: #263352;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+    min-height: 100vh;
+  }
+  .mono{ font-family: 'JetBrains Mono', 'Courier New', monospace; }
+
+  /* header */
+  .app-header{
+    padding: 28px 20px 20px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #0E1626 0%, #0B1220 100%);
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+  }
+  .brand-mark{
+    width:34px; height:34px;
+    border-radius: 8px;
+    background: var(--amber);
+    display:flex; align-items:center; justify-content:center;
+    color:#151515; font-weight:800; font-size:15px;
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink:0;
+  }
+  .brand-text{ line-height:1.1; }
+  .brand-text .name{ font-weight:700; font-size:17px; letter-spacing:0.2px;}
+  .brand-text .tag{ font-size:11.5px; color:var(--muted); letter-spacing:0.4px; text-transform:uppercase; margin-top:2px;}
+
+  .search-wrap{
+    margin-top:22px;
+    position:relative;
+  }
+  .search-input{
+    width:100%;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px 16px 14px 44px;
+    color: var(--text);
+    font-size: 15px;
+    outline:none;
+  }
+  .search-input:focus{ border-color: var(--amber); }
+  .search-input::placeholder{ color: var(--muted); }
+  .search-icon{
+    position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    color: var(--muted); font-size:16px; pointer-events:none;
+  }
+
+  .suggestions{
+    display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;
+  }
+  .chip{
+    background: var(--panel-2);
+    border:1px solid var(--line);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    cursor:pointer;
+    transition: all .15s ease;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .chip:hover, .chip.active{
+    border-color: var(--amber);
+    color: var(--amber);
+  }
+
+  /* main */
+  main{ padding: 22px 20px 80px; max-width: 640px; margin: 0 auto; }
+
+  .airport-banner{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    margin-bottom:18px;
+    padding-bottom:16px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .airport-banner .code{
+    font-family:'JetBrains Mono', monospace;
+    color: var(--amber);
+    font-size: 13px;
+    letter-spacing: 1px;
+  }
+  .airport-banner .city{
+    font-size: 22px;
+    font-weight: 700;
+    margin-top:4px;
+  }
+  .airport-banner .updated{
+    text-align:right;
+    font-size:11.5px;
+    color: var(--muted);
+  }
+  .airport-banner .updated b{
+    display:block;
+    color: var(--green);
+    font-size: 12.5px;
+    font-weight:600;
+  }
+
+  .section-label{
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin: 22px 0 10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .section-label::after{
+    content:"";
+    flex:1;
+    height:1px;
+    background: var(--line);
+  }
+
+  .card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px 16px 14px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow:hidden;
+  }
+  .card::before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0;
+    width:4px;
+  }
+  .card.high::before{ background: var(--red); }
+  .card.med::before{ background: var(--amber); }
+  .card.low::before{ background: var(--green); }
+
+  .card-top{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    gap: 10px;
+  }
+  .card-title{
+    font-size: 15px;
+    font-weight: 650;
+    line-height:1.35;
+  }
+  .badge{
+    flex-shrink:0;
+    font-size: 10px;
+    font-weight:700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space:nowrap;
+  }
+  .badge.high{ background: rgba(242,102,90,0.15); color: var(--red); }
+  .badge.med{ background: rgba(242,169,59,0.15); color: var(--amber); }
+  .badge.low{ background: rgba(74,222,128,0.15); color: var(--green); }
+
+  .card-meta{
+    display:flex; gap:14px; margin-top:8px;
+    font-size:12px; color: var(--muted);
+  }
+
+  .toggle-raw{
+    margin-top:12px;
+    font-size: 12px;
+    color: var(--amber);
+    cursor:pointer;
+    display:inline-flex; align-items:center; gap:5px;
+    user-select:none;
+  }
+  .toggle-raw::before{ content:"▸"; font-size:10px; transition: transform .15s; }
+  .toggle-raw.open::before{ transform: rotate(90deg); }
+
+  .raw-box{
+    display:none;
+    margin-top: 10px;
+    background: #0B111E;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height:1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .raw-box.show{ display:block; }
+
+  .empty{
+    text-align:center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty .icon{ font-size: 32px; margin-bottom: 10px; }
+
+  .footnote{
+    text-align:center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 30px;
+    line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="brand">
+    <div class="brand-mark">AV</div>
+    <div class="brand-text">
+      <div class="name">Aviso Aéreo</div>
+      <div class="tag">Notícias de voo, sem jargão</div>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input class="search-input" id="searchInput" placeholder="Buscar aeroporto ou cidade..." />
+  </div>
+
+  <div class="suggestions" id="chips"></div>
+</div>
+
+<main>
+  <div class="airport-banner" id="banner"></div>
+  <div id="sections"></div>
+</main>
+
+<div class="footnote">
+  Protótipo com dados de exemplo · fonte planejada: API AISWEB / DECEA
+</div>
+
+<script>
+const AIRPORTS = [
+  { code: "SBFL", city: "Florianópolis", uf: "SC" },
+  { code: "SBGR", city: "Guarulhos (São Paulo)", uf: "SP" },
+  { code: "SBRJ", city: "Santos Dumont (Rio de Janeiro)", uf: "RJ" },
+  { code: "SBBR", city: "Brasília", uf: "DF" },
+  { code: "SBCF", city: "Confins (Belo Horizonte)", uf: "MG" },
+];
+
+// dados fictícios só para o protótipo
+const MOCK_DATA = {
+  SBFL: {
+    updated: "há 12 min",
+    notices: [
+      {
+        level: "high",
+        title: "Pista principal com uso parcial por manutenção noturna",
+        plain: "Entre 23h e 5h, apenas parte da pista está disponível para pouso e decolagem. Voos nesse horário podem ter pequenos atrasos.",
+        raw: "SBFL RWY 14/32 PARTIAL CLSD 2300-0500 DUE MAINT WEF 25 JUL UNTIL 02 AUG",
+        category: "Pista", validity: "25/07 – 02/08"
+      },
+      {
+        level: "med",
+        title: "Sistema de luzes de aproximação temporariamente fora de serviço",
+        plain: "As luzes que ajudam pilotos a enxergar a pista à noite estão desligadas para conserto. Isso pode causar pequenos atrasos em pousos noturnos com pouca visibilidade.",
+        raw: "SBFL ALS RWY14 U/S WEF 24 JUL 0600 UNTIL 28 JUL 1800",
+        category: "Equipamento", validity: "24/07 – 28/07"
+      },
+      {
+        level: "low",
+        title: "Obras de sinalização no pátio de aeronaves",
+        plain: "Pequena área do pátio onde as aeronaves estacionam está sendo repintada. Não afeta pousos ou decolagens.",
+        raw: "SBFL APRON STAND 4 MARKING WORK IN PROGRESS DAILY 0900-1600",
+        category: "Solo", validity: "contínuo"
+      }
+    ]
+  },
+  SBGR: {
+    updated: "há 3 min",
+    notices: [
+      {
+        level: "high",
+        title: "Uma das pistas fechada por acidente com veículo de solo",
+        plain: "Uma das duas pistas está temporariamente fechada após um incidente com um veículo de apoio. Voos estão sendo redirecionados para a outra pista, o que pode gerar atrasos.",
+        raw: "SBGR RWY 09R/27L CLSD DUE GROUND VEHICLE INCIDENT WEF 25 JUL 1140 UNTIL FURTHER NOTICE",
+        category: "Pista", validity: "em andamento"
+      },
+      {
+        level: "med",
+        title: "Restrição de espaço aéreo por evento com drones",
+        plain: "Nos arredores do aeroporto, há uma restrição temporária de voo baixo por causa de um evento autorizado com drones. Aeronaves comerciais não são afetadas.",
+        raw: "SBGR AIRSPACE RESTRICTION SFC-500FT RADIUS 3NM DUE AUTHORIZED UAS DISPLAY 26 JUL 1900-2100",
+        category: "Espaço aéreo", validity: "26/07"
+      }
+    ]
+  },
+  SBRJ: {
+    updated: "há 40 min",
+    notices: [
+      {
+        level: "low",
+        title: "Manutenção programada em radiofarol de navegação",
+        plain: "Um dos equipamentos que ajuda aviões a se orientar está passando por manutenção de rotina. Pilotos usam outros sistemas de apoio nesse período, sem impacto perceptível para passageiros.",
+        raw: "SBRJ VOR/DME U/S FOR MAINT WEF 25 JUL 0800 UNTIL 25 JUL 1400",
+        category: "Navegação", validity: "25/07"
+      }
+    ]
+  },
+  SBBR: { updated: "há 1h", notices: [] },
+  SBCF: {
+    updated: "há 25 min",
+    notices: [
+      {
+        level: "med",
+        title: "Obras na via de acesso ao terminal de cargas",
+        plain: "Uma via de acesso usada por veículos de carga está parcialmente interditada para obras. Não afeta passageiros nem voos.",
+        raw: "SBCF CARGO ACCESS ROAD PARTIAL CLSD DUE CONSTRUCTION WEF 20 JUL UNTIL 10 AUG",
+        category: "Solo", validity: "20/07 – 10/08"
+      }
+    ]
+  },
+};
+
+let currentCode = "SBFL";
+
+function levelLabel(l){
+  return l === "high" ? "Atenção" : l === "med" ? "Aviso" : "Informativo";
+}
+
+function renderChips(){
+  const chips = document.getElementById('chips');
+  chips.innerHTML = "";
+  AIRPORTS.forEach(a => {
+    const el = document.createElement('div');
+    el.className = 'chip' + (a.code === currentCode ? ' active' : '');
+    el.textContent = a.code;
+    el.onclick = () => { currentCode = a.code; render(); };
+    chips.appendChild(el);
+  });
+}
+
+function render(){
+  renderChips();
+  const airport = AIRPORTS.find(a => a.code === currentCode);
+  const data = MOCK_DATA[currentCode] || { updated: "—", notices: [] };
+
+  document.getElementById('banner').innerHTML = `
+    <div>
+      <div class="code">${airport.code} · ${airport.uf}</div>
+      <div class="city">${airport.city}</div>
+    </div>
+    <div class="updated">Atualizado<b>${data.updated}</b></div>
+  `;
+
+  const sections = document.getElementById('sections');
+
+  if(data.notices.length === 0){
+    sections.innerHTML = `
+      <div class="empty">
+        <div class="icon">✓</div>
+        Nenhum aviso relevante no momento para este aeroporto.
+      </div>`;
+    return;
+  }
+
+  sections.innerHTML = `<div class="section-label">Avisos ativos · ${data.notices.length}</div>` +
+    data.notices.map((n, i) => `
+      <div class="card ${n.level}">
+        <div class="card-top">
+          <div class="card-title">${n.title}</div>
+          <div class="badge ${n.level}">${levelLabel(n.level)}</div>
+        </div>
+        <div style="margin-top:8px; font-size:13.5px; color:var(--text); opacity:0.9; line-height:1.5;">
+          ${n.plain}
+        </div>
+        <div class="card-meta">
+          <span>${n.category}</span>
+          <span>Válido: ${n.validity}</span>
+        </div>
+        <div class="toggle-raw" onclick="toggleRaw(${i})" id="toggle-${i}">Ver texto original (NOTAM)</div>
+        <div class="raw-box" id="raw-${i}">${n.raw}</div>
+      </div>
+    `).join('');
+}
+
+function toggleRaw(i){
+  document.getElementById(`raw-${i}`).classList.toggle('show');
+  document.getElementById(`toggle-${i}`).classList.toggle('open');
+}
+
+document.getElementById('searchInput').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  if(!q) return;
+  const match = AIRPORTS.find(a =>
+    a.code.toLowerCase().includes(q) ||
+    a.city.toLowerCase().includes(q)
+  );
+  if(match){ currentCode = match.code; render(); }
+});
+
+render();
+</script>
+</body>
+</html>
