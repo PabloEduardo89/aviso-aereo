@@ -15,6 +15,7 @@
     --muted: #7C8AA5;
     --green: #4ADE80;
     --red: #F2665A;
+    --blue: #5FA8E8;
     --line: #263352;
   }
   *{ box-sizing: border-box; }
@@ -94,7 +95,7 @@
 
   .airport-banner{
     display:flex; justify-content:space-between; align-items:flex-end;
-    margin-bottom:18px;
+    margin-bottom:16px;
     padding-bottom:16px;
     border-bottom: 1px dashed var(--line);
   }
@@ -121,6 +122,35 @@
     font-weight:600;
   }
 
+  /* tabs (NOTAM / METAR / ROTAER) */
+  .tabs{
+    display:flex;
+    gap:6px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 20px;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding: 9px 8px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--muted);
+    cursor:pointer;
+    transition: all .15s ease;
+    user-select:none;
+    letter-spacing:0.3px;
+  }
+  .tab:hover{ color: var(--text); }
+  .tab.active{
+    background: var(--amber);
+    color: #151515;
+  }
+
   .section-label{
     font-size: 11px;
     text-transform: uppercase;
@@ -135,6 +165,7 @@
     height:1px;
     background: var(--line);
   }
+  .section-label:first-child{ margin-top:0; }
 
   .card{
     background: var(--panel);
@@ -153,6 +184,7 @@
   .card.high::before{ background: var(--red); }
   .card.med::before{ background: var(--amber); }
   .card.low::before{ background: var(--green); }
+  .card.info::before{ background: var(--blue); }
 
   .card-top{
     display:flex; justify-content:space-between; align-items:flex-start;
@@ -176,14 +208,18 @@
   .badge.high{ background: rgba(242,102,90,0.15); color: var(--red); }
   .badge.med{ background: rgba(242,169,59,0.15); color: var(--amber); }
   .badge.low{ background: rgba(74,222,128,0.15); color: var(--green); }
+  .badge.info{ background: rgba(95,168,232,0.15); color: var(--blue); }
 
   .card-meta{
     display:flex; gap:14px; margin-top:8px;
     font-size:12px; color: var(--muted);
   }
 
-  .toggle-raw{
+  .link-row{
+    display:flex; gap:16px;
     margin-top:12px;
+  }
+  .toggle-raw, .link-detail{
     font-size: 12px;
     color: var(--amber);
     cursor:pointer;
@@ -192,6 +228,8 @@
   }
   .toggle-raw::before{ content:"▸"; font-size:10px; transition: transform .15s; }
   .toggle-raw.open::before{ transform: rotate(90deg); }
+  .link-detail{ color: var(--blue); }
+  .link-detail::after{ content:"→"; font-size:12px; }
 
   .raw-box{
     display:none;
@@ -209,6 +247,54 @@
   }
   .raw-box.show{ display:block; }
 
+  /* METAR grid */
+  .metar-grid{
+    display:grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .metar-stat{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .metar-stat .label{
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .metar-stat .value{
+    font-size: 19px;
+    font-weight: 700;
+  }
+  .metar-stat .value span{
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  /* ROTAER info list */
+  .rotaer-card{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .rotaer-row{
+    display:flex; justify-content:space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 13.5px;
+  }
+  .rotaer-row:last-child{ border-bottom:none; }
+  .rotaer-row .k{ color: var(--muted); }
+  .rotaer-row .v{ font-weight: 600; text-align:right; }
+
   .empty{
     text-align:center;
     padding: 60px 20px;
@@ -223,6 +309,102 @@
     margin-top: 30px;
     line-height:1.6;
   }
+
+  /* ---- detail (sub-page / camada 2) ---- */
+  .back-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:13px; color: var(--muted);
+    cursor:pointer; margin-bottom:16px;
+    user-select:none;
+  }
+  .back-btn:hover{ color: var(--text); }
+  .back-btn::before{ content:"←"; }
+
+  .detail-header{
+    margin-bottom:18px;
+  }
+  .detail-header .d-title{
+    font-size:19px; font-weight:700; line-height:1.35;
+  }
+  .detail-header .d-meta{
+    margin-top:6px; font-size:12px; color:var(--muted);
+    display:flex; gap:12px;
+  }
+
+  .image-frame{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 10px;
+    margin-bottom: 8px;
+    overflow:hidden;
+  }
+  .image-frame svg{ width:100%; height:auto; display:block; border-radius:8px; }
+  .image-caption{
+    font-size: 11px;
+    color: var(--muted);
+    text-align:center;
+    margin-bottom:18px;
+    line-height:1.5;
+  }
+  .image-caption b{ color: var(--amber); font-weight:600; }
+
+  .plain-block{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--amber);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 18px;
+  }
+
+  .tech-table{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow:hidden;
+    margin-bottom: 16px;
+  }
+  .tech-row{
+    display:flex;
+    border-bottom: 1px solid var(--line);
+  }
+  .tech-row:last-child{ border-bottom:none; }
+  .tech-code{
+    width: 92px; flex-shrink:0;
+    font-family:'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--amber);
+    padding: 12px 10px;
+    background: var(--panel-2);
+    display:flex; align-items:center;
+  }
+  .tech-mean{
+    padding: 12px 14px;
+    font-size: 13px;
+    flex:1;
+  }
+  .tech-mean .t{ font-weight:600; margin-bottom:2px; }
+  .tech-mean .d{ color: var(--muted); font-size:12px; }
+
+  .source-tag{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size: 10.5px;
+    letter-spacing:0.3px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+  .source-tag .dot{
+    width:6px; height:6px; border-radius:50%;
+    background: var(--muted);
+    flex-shrink:0;
+  }
+  .source-tag.real .dot{ background: var(--green); }
+  .source-tag.real{ color: var(--green); }
+  .source-tag.fallback .dot{ background: var(--amber); }
+  .source-tag.fallback{ color: var(--amber); }
 </style>
 </head>
 <body>
@@ -244,16 +426,27 @@
   <div class="suggestions" id="chips"></div>
 </div>
 
-<main>
-  <div class="airport-banner" id="banner"></div>
-  <div id="sections"></div>
-</main>
+<main id="main"></main>
 
 <div class="footnote">
-  Protótipo com dados de exemplo · fonte planejada: API AISWEB / DECEA
+  Protótipo · NOTAM/ROTAER com dados de exemplo · METAR conectado à API-REDEMET (DECEA)
 </div>
 
 <script>
+/* =========================================================
+   CONFIGURAÇÃO — API-REDEMET (DECEA)
+   ========================================================= */
+const REDEMET_API_KEY = "fCgPZoKnuHWCzkXx5OAJDDXVTxXQLP9x6DKqWmHq";
+// Domínio confirmado por e-mail junto com a chave. A documentação pública
+// também referencia api-redemet.decea.mil.br — se este domínio parar de
+// responder, tente trocar por esse.
+const REDEMET_BASE = "https://api-redemet.decea.gov.br";
+
+// cache de dados reais buscados na API-REDEMET, por código ICAO
+// undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
+const REAL_METAR = {};
+const metarLoading = {};
+
 const AIRPORTS = [
   { code: "SBFL", city: "Florianópolis", uf: "SC" },
   { code: "SBGR", city: "Guarulhos (São Paulo)", uf: "SP" },
@@ -262,84 +455,219 @@ const AIRPORTS = [
   { code: "SBCF", city: "Confins (Belo Horizonte)", uf: "MG" },
 ];
 
+const TABS = [
+  { id: "notam", label: "NOTAM" },
+  { id: "metar", label: "METAR" },
+  { id: "rotaer", label: "ROTAER" },
+];
+
 // dados fictícios só para o protótipo
-const MOCK_DATA = {
-  SBFL: {
-    updated: "há 12 min",
-    notices: [
-      {
-        level: "high",
-        title: "Pista principal com uso parcial por manutenção noturna",
-        plain: "Entre 23h e 5h, apenas parte da pista está disponível para pouso e decolagem. Voos nesse horário podem ter pequenos atrasos.",
-        raw: "SBFL RWY 14/32 PARTIAL CLSD 2300-0500 DUE MAINT WEF 25 JUL UNTIL 02 AUG",
-        category: "Pista", validity: "25/07 – 02/08"
-      },
-      {
-        level: "med",
-        title: "Sistema de luzes de aproximação temporariamente fora de serviço",
-        plain: "As luzes que ajudam pilotos a enxergar a pista à noite estão desligadas para conserto. Isso pode causar pequenos atrasos em pousos noturnos com pouca visibilidade.",
-        raw: "SBFL ALS RWY14 U/S WEF 24 JUL 0600 UNTIL 28 JUL 1800",
-        category: "Equipamento", validity: "24/07 – 28/07"
-      },
-      {
-        level: "low",
-        title: "Obras de sinalização no pátio de aeronaves",
-        plain: "Pequena área do pátio onde as aeronaves estacionam está sendo repintada. Não afeta pousos ou decolagens.",
-        raw: "SBFL APRON STAND 4 MARKING WORK IN PROGRESS DAILY 0900-1600",
-        category: "Solo", validity: "contínuo"
-      }
-    ]
-  },
-  SBGR: {
-    updated: "há 3 min",
-    notices: [
-      {
-        level: "high",
-        title: "Uma das pistas fechada por acidente com veículo de solo",
-        plain: "Uma das duas pistas está temporariamente fechada após um incidente com um veículo de apoio. Voos estão sendo redirecionados para a outra pista, o que pode gerar atrasos.",
-        raw: "SBGR RWY 09R/27L CLSD DUE GROUND VEHICLE INCIDENT WEF 25 JUL 1140 UNTIL FURTHER NOTICE",
-        category: "Pista", validity: "em andamento"
-      },
-      {
-        level: "med",
-        title: "Restrição de espaço aéreo por evento com drones",
-        plain: "Nos arredores do aeroporto, há uma restrição temporária de voo baixo por causa de um evento autorizado com drones. Aeronaves comerciais não são afetadas.",
-        raw: "SBGR AIRSPACE RESTRICTION SFC-500FT RADIUS 3NM DUE AUTHORIZED UAS DISPLAY 26 JUL 1900-2100",
-        category: "Espaço aéreo", validity: "26/07"
-      }
-    ]
-  },
-  SBRJ: {
-    updated: "há 40 min",
-    notices: [
-      {
-        level: "low",
-        title: "Manutenção programada em radiofarol de navegação",
-        plain: "Um dos equipamentos que ajuda aviões a se orientar está passando por manutenção de rotina. Pilotos usam outros sistemas de apoio nesse período, sem impacto perceptível para passageiros.",
-        raw: "SBRJ VOR/DME U/S FOR MAINT WEF 25 JUL 0800 UNTIL 25 JUL 1400",
-        category: "Navegação", validity: "25/07"
-      }
-    ]
-  },
+const MOCK_NOTAM = {
+  SBFL: { updated: "há 12 min", notices: [
+    { level:"high", title:"Pista principal com uso parcial por manutenção noturna",
+      plain:"Entre 23h e 5h, apenas parte da pista está disponível para pouso e decolagem. Voos nesse horário podem ter pequenos atrasos.",
+      full:"A pista 14/32 opera com comprimento reduzido durante a madrugada enquanto equipes realizam reparo no pavimento na cabeceira 32. Aeronaves de maior porte podem ser reorientadas para pousar pela cabeceira 14 durante esse período. A previsão é de normalização total até o dia 2 de agosto.",
+      raw:"SBFL RWY 14/32 PARTIAL CLSD 2300-0500 DUE MAINT WEF 25 JUL UNTIL 02 AUG",
+      category:"Pista", validity:"25/07 – 02/08", affected:"rwy32" },
+    { level:"med", title:"Sistema de luzes de aproximação temporariamente fora de serviço",
+      plain:"As luzes que ajudam pilotos a enxergar a pista à noite estão desligadas para conserto. Isso pode causar pequenos atrasos em pousos noturnos com pouca visibilidade.",
+      full:"O sistema de luzes de aproximação (ALS) da cabeceira 14 está em manutenção corretiva. Em condições de boa visibilidade o impacto é mínimo; à noite ou com neblina, o controle de tráfego aéreo pode espaçar mais os pousos por segurança.",
+      raw:"SBFL ALS RWY14 U/S WEF 24 JUL 0600 UNTIL 28 JUL 1800",
+      category:"Equipamento", validity:"24/07 – 28/07", affected:"rwy14" },
+    { level:"low", title:"Obras de sinalização no pátio de aeronaves",
+      plain:"Pequena área do pátio onde as aeronaves estacionam está sendo repintada. Não afeta pousos ou decolagens.",
+      full:"A posição 4 do pátio de estacionamento está com sinalização horizontal sendo repintada em horário diurno. Aeronaves são direcionadas a posições alternativas durante o serviço.",
+      raw:"SBFL APRON STAND 4 MARKING WORK IN PROGRESS DAILY 0900-1600",
+      category:"Solo", validity:"contínuo", affected:"apron" }
+  ]},
+  SBGR: { updated: "há 3 min", notices: [
+    { level:"high", title:"Uma das pistas fechada por acidente com veículo de solo",
+      plain:"Uma das duas pistas está temporariamente fechada após um incidente com um veículo de apoio. Voos estão sendo redirecionados para a outra pista, o que pode gerar atrasos.",
+      full:"A pista 09R/27L foi fechada após um incidente envolvendo um veículo de manutenção de solo. Toda a operação de pousos e decolagens foi concentrada na pista 09L/27R, reduzindo a capacidade horária do aeroporto. Reabertura sem previsão definida.",
+      raw:"SBGR RWY 09R/27L CLSD DUE GROUND VEHICLE INCIDENT WEF 25 JUL 1140 UNTIL FURTHER NOTICE",
+      category:"Pista", validity:"em andamento", affected:"rwy09r" },
+    { level:"med", title:"Restrição de espaço aéreo por evento com drones",
+      plain:"Nos arredores do aeroporto, há uma restrição temporária de voo baixo por causa de um evento autorizado com drones. Aeronaves comerciais não são afetadas.",
+      full:"Foi autorizada uma exibição de drones num raio de 3 milhas náuticas ao redor do aeroporto, do solo até 500 pés de altura. Voos comerciais operam normalmente, pois o evento ocorre em faixa de altitude abaixo das rotas de aproximação.",
+      raw:"SBGR AIRSPACE RESTRICTION SFC-500FT RADIUS 3NM DUE AUTHORIZED UAS DISPLAY 26 JUL 1900-2100",
+      category:"Espaço aéreo", validity:"26/07", affected:"airspace" }
+  ]},
+  SBRJ: { updated: "há 40 min", notices: [
+    { level:"low", title:"Manutenção programada em radiofarol de navegação",
+      plain:"Um dos equipamentos que ajuda aviões a se orientar está passando por manutenção de rotina. Pilotos usam outros sistemas de apoio nesse período, sem impacto perceptível para passageiros.",
+      full:"O VOR/DME do aeródromo entra em manutenção preventiva programada. Aeronaves equipadas com GPS ou outros auxílios à navegação não sentem impacto operacional relevante.",
+      raw:"SBRJ VOR/DME U/S FOR MAINT WEF 25 JUL 0800 UNTIL 25 JUL 1400",
+      category:"Navegação", validity:"25/07", affected:"nav" }
+  ]},
   SBBR: { updated: "há 1h", notices: [] },
-  SBCF: {
-    updated: "há 25 min",
-    notices: [
-      {
-        level: "med",
-        title: "Obras na via de acesso ao terminal de cargas",
-        plain: "Uma via de acesso usada por veículos de carga está parcialmente interditada para obras. Não afeta passageiros nem voos.",
-        raw: "SBCF CARGO ACCESS ROAD PARTIAL CLSD DUE CONSTRUCTION WEF 20 JUL UNTIL 10 AUG",
-        category: "Solo", validity: "20/07 – 10/08"
-      }
-    ]
-  },
+  SBCF: { updated: "há 25 min", notices: [
+    { level:"med", title:"Obras na via de acesso ao terminal de cargas",
+      plain:"Uma via de acesso usada por veículos de carga está parcialmente interditada para obras. Não afeta passageiros nem voos.",
+      full:"A via interna usada por caminhões que abastecem o terminal de cargas está com uma faixa interditada para pavimentação. O tráfego de veículos é feito de forma alternada, sem impacto em voos ou no terminal de passageiros.",
+      raw:"SBCF CARGO ACCESS ROAD PARTIAL CLSD DUE CONSTRUCTION WEF 20 JUL UNTIL 10 AUG",
+      category:"Solo", validity:"20/07 – 10/08", affected:"apron" }
+  ]},
 };
 
+const MOCK_METAR = {
+  SBFL: { updated:"há 8 min", wind:"180°", windSpeed:"12 kt", visibility:"10 km", clouds:"Poucas nuvens a 2500 ft",
+    temp:"22°C", dew:"17°C", qnh:"1017 hPa", condition:"Bom para voo", level:"low",
+    raw:"METAR SBFL 260800Z 18012KT 9999 FEW025 22/17 Q1017=" },
+  SBGR: { updated:"há 4 min", wind:"090°", windSpeed:"18 kt, rajadas 28 kt", visibility:"6 km", clouds:"Nublado a 1200 ft",
+    temp:"19°C", dew:"16°C", qnh:"1014 hPa", condition:"Vento forte — possíveis atrasos", level:"med",
+    raw:"METAR SBGR 260755Z 09018G28KT 6000 BKN012 19/16 Q1014=" },
+  SBRJ: { updated:"há 15 min", wind:"140°", windSpeed:"8 kt", visibility:"10 km", clouds:"Céu limpo",
+    temp:"26°C", dew:"19°C", qnh:"1015 hPa", condition:"Bom para voo", level:"low",
+    raw:"METAR SBRJ 260745Z 14008KT 9999 SKC 26/19 Q1015=" },
+  SBBR: { updated:"há 22 min", wind:"060°", windSpeed:"5 kt", visibility:"10 km", clouds:"Poucas nuvens a 3000 ft",
+    temp:"24°C", dew:"12°C", qnh:"1018 hPa", condition:"Bom para voo", level:"low",
+    raw:"METAR SBBR 260738Z 06005KT 9999 FEW030 24/12 Q1018=" },
+  SBCF: { updated:"há 30 min", wind:"220°", windSpeed:"14 kt", visibility:"4 km, neblina", clouds:"Nublado a 800 ft",
+    temp:"17°C", dew:"16°C", qnh:"1016 hPa", condition:"Baixa visibilidade — possíveis atrasos", level:"med",
+    raw:"METAR SBCF 260730Z 22014KT 4000 BR OVC008 17/16 Q1016=" },
+};
+
+const MOCK_ROTAER = {
+  SBFL: { nome:"Aeroporto Hercílio Luz", elevacao:"16 ft", pista:"14/32 — 2670 x 45 m, asfalto",
+    horario:"24 horas", freqTorre:"118.1 MHz", freqAproximacao:"119.05 MHz", combustivel:"JET A1 / AVGAS 100LL" },
+  SBGR: { nome:"Aeroporto Internacional de Guarulhos", elevacao:"750 ft", pista:"09L/27R e 09R/27L — 3000 m, asfalto",
+    horario:"24 horas", freqTorre:"118.05 MHz", freqAproximacao:"119.75 MHz", combustivel:"JET A1" },
+  SBRJ: { nome:"Aeroporto Santos Dumont", elevacao:"11 ft", pista:"02L/20R — 1323 x 55 m, asfalto",
+    horario:"6h às 23h", freqTorre:"118.3 MHz", freqAproximacao:"127.05 MHz", combustivel:"JET A1" },
+  SBBR: { nome:"Aeroporto Internacional de Brasília", elevacao:"3497 ft", pista:"11L/29R — 3300 m, asfalto",
+    horario:"24 horas", freqTorre:"118.1 MHz", freqAproximacao:"125.7 MHz", combustivel:"JET A1 / AVGAS 100LL" },
+  SBCF: { nome:"Aeroporto Internacional de Confins", elevacao:"2717 ft", pista:"02/20 — 3000 m, asfalto",
+    horario:"24 horas", freqTorre:"118.0 MHz", freqAproximacao:"125.5 MHz", combustivel:"JET A1" },
+};
+
+/* =========================================================
+   INTEGRAÇÃO REAL — API-REDEMET (METAR)
+   ========================================================= */
+function pad(n){ return n.toString().padStart(2,'0'); }
+
+function nowUTCString(offsetHours){
+  const d = new Date(Date.now() + (offsetHours||0)*3600*1000);
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`;
+}
+
+function timeAgo(dateStr){
+  if(!dateStr) return "agora mesmo";
+  const then = new Date(dateStr.replace(' ', 'T') + 'Z').getTime();
+  if(isNaN(then)) return "agora mesmo";
+  const diffMin = Math.round((Date.now() - then)/60000);
+  if(diffMin < 1) return "agora mesmo";
+  if(diffMin < 60) return `há ${diffMin} min`;
+  return `há ${Math.round(diffMin/60)}h`;
+}
+
+const CLOUD_NAMES = { FEW:'Poucas nuvens', SCT:'Nuvens esparsas', BKN:'Nublado', OVC:'Encoberto' };
+const WX_MAP = { BR:'neblina', FG:'nevoeiro', RA:'chuva', TS:'trovoada', DZ:'garoa', SN:'neve', HZ:'neblina seca', FU:'fumaça' };
+
+function parseMetarRaw(mens, recebimento){
+  const clean = mens.replace('=','').trim();
+  const tokens = clean.split(/\s+/);
+
+  let windText = '—', windSpeedText = '—', windKt = 0, gustKt = 0;
+  let visibilityKm = 10, visibilityText = '10 km';
+  let cloudsText = 'Céu limpo';
+  let tempText = '—', dewText = '—', qnhText = '—';
+  const wxPhrases = [];
+
+  tokens.forEach(tok => {
+    let m;
+    if((m = tok.match(/^(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT$/))){
+      windText = m[1] === 'VRB' ? 'Variável' : `${m[1]}°`;
+      windKt = parseInt(m[2], 10);
+      gustKt = m[4] ? parseInt(m[4], 10) : 0;
+      windSpeedText = gustKt ? `${windKt} kt, rajadas ${gustKt} kt` : `${windKt} kt`;
+    } else if(tok === 'CAVOK'){
+      visibilityKm = 10; visibilityText = '10 km (CAVOK)'; cloudsText = 'Céu limpo';
+    } else if(/^\d{4}$/.test(tok) && tok !== '0000'){
+      const meters = parseInt(tok, 10);
+      visibilityKm = meters/1000;
+      visibilityText = meters >= 9999 ? '10 km' : `${(meters/1000).toFixed(1)} km`;
+    } else if(['SKC','NSC','CLR'].includes(tok)){
+      cloudsText = 'Céu limpo';
+    } else if((m = tok.match(/^(FEW|SCT|BKN|OVC)(\d{3})$/))){
+      const desc = `${CLOUD_NAMES[m[1]]} a ${parseInt(m[2],10)*100} ft`;
+      cloudsText = cloudsText === 'Céu limpo' ? desc : `${cloudsText} / ${desc}`;
+    } else if(WX_MAP[tok]){
+      wxPhrases.push(WX_MAP[tok]);
+    } else if((m = tok.match(/^(M?\d{2})\/(M?\d{2})$/))){
+      tempText = (m[1].startsWith('M') ? '-'+m[1].slice(1) : m[1]) + '°C';
+      dewText = (m[2].startsWith('M') ? '-'+m[2].slice(1) : m[2]) + '°C';
+    } else if((m = tok.match(/^Q(\d{4})$/))){
+      qnhText = `${parseInt(m[1],10)} hPa`;
+    }
+  });
+
+  if(wxPhrases.length) cloudsText += ` — ${wxPhrases.join(', ')}`;
+
+  let level = 'low', condition = 'Bom para voo';
+  const hasLowVis = visibilityKm < 5 || wxPhrases.some(w => ['neblina','nevoeiro'].includes(w));
+  const hasStrongWind = windKt >= 20 || gustKt >= 30;
+  if(hasLowVis){ level = 'med'; condition = 'Baixa visibilidade — possíveis atrasos'; }
+  else if(hasStrongWind){ level = 'med'; condition = 'Vento forte — possíveis atrasos'; }
+
+  return {
+    updated: timeAgo(recebimento),
+    wind: windText,
+    windSpeed: windSpeedText,
+    visibility: visibilityText,
+    clouds: cloudsText,
+    temp: tempText,
+    dew: dewText,
+    qnh: qnhText,
+    condition, level,
+    raw: clean + '='
+  };
+}
+
+async function loadRealMetar(icao){
+  if(metarLoading[icao]) return;
+  metarLoading[icao] = true;
+  try{
+    const dataFim = nowUTCString(0);
+    const dataIni = nowUTCString(-6); // últimas 6h, pega a mensagem mais recente disponível
+    const url = `${REDEMET_BASE}/mensagens/metar/${icao}?data_ini=${dataIni}&data_fim=${dataFim}`;
+    const resp = await fetch(url, { headers: { 'X-Api-Key': REDEMET_API_KEY } });
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const list = (json && json.data && json.data.data) || [];
+    if(list.length === 0) throw new Error('sem mensagens no período consultado');
+    const ultima = list[list.length - 1];
+    REAL_METAR[icao] = parseMetarRaw(ultima.mens, ultima.recebimento);
+  }catch(err){
+    console.warn('Falha ao buscar METAR real da REDEMET para', icao, err);
+    REAL_METAR[icao] = null; // marca como "tentou e falhou" -> cai no mock
+  }finally{
+    metarLoading[icao] = false;
+    if(currentTab === 'metar' && currentCode === icao){
+      render();
+    }
+  }
+}
+
+function getMetarData(icao){
+  if(REAL_METAR[icao]) return { ...REAL_METAR[icao], source: 'real' };
+  if(REAL_METAR[icao] === null) return MOCK_METAR[icao] ? { ...MOCK_METAR[icao], source: 'fallback' } : null;
+  return MOCK_METAR[icao] ? { ...MOCK_METAR[icao], source: 'loading' } : null;
+}
+
+function sourceTagHtml(source){
+  if(source === 'real') return `<div class="source-tag real"><span class="dot"></span>Dado real — API-REDEMET</div>`;
+  if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado real da REDEMET...</div>`;
+  if(source === 'fallback') return `<div class="source-tag fallback"><span class="dot"></span>Dado de exemplo — REDEMET indisponível no momento</div>`;
+  return '';
+}
+
 let currentCode = "SBFL";
+let currentTab = "notam";
+let currentView = "list";   // 'list' | 'notam-detail' | 'metar-detail'
+let currentNotamIndex = 0;
 
 function levelLabel(l){
-  return l === "high" ? "Atenção" : l === "med" ? "Aviso" : "Informativo";
+  return l === "high" ? "Atenção" : l === "med" ? "Aviso" : l === "info" ? "Info" : "Informativo";
 }
 
 function renderChips(){
@@ -349,35 +677,121 @@ function renderChips(){
     const el = document.createElement('div');
     el.className = 'chip' + (a.code === currentCode ? ' active' : '');
     el.textContent = a.code;
-    el.onclick = () => { currentCode = a.code; render(); };
+    el.onclick = () => { currentCode = a.code; currentView = 'list'; render(); };
     chips.appendChild(el);
   });
 }
 
+/* ---------- SVGs de exemplo (placeholders ilustrativos) ---------- */
+
+function svgRunwayChart(affected){
+  const highlightMap = {
+    rwy32: {x:60, y:40, w:60, h:14},
+    rwy14: {x:60, y:126, w:60, h:14},
+    rwy09r:{x:40, y:80, w:220, h:10},
+    apron: {x:210, y:110, w:40, h:36},
+    airspace:{x:0,y:0,w:0,h:0},
+    nav: {x:250, y:70, w:16, h:16}
+  };
+  const hl = highlightMap[affected] || {x:0,y:0,w:0,h:0};
+  const highlightRect = hl.w ? `<rect x="${hl.x}" y="${hl.y}" width="${hl.w}" height="${hl.h}" rx="4" fill="none" stroke="#F2665A" stroke-width="2.5" stroke-dasharray="4 3"/>` : '';
+  return `
+  <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+    <rect width="320" height="180" fill="#0B111E"/>
+    <rect x="20" y="60" width="280" height="20" rx="2" fill="#2B3A56"/>
+    <rect x="20" y="118" width="280" height="20" rx="2" fill="#2B3A56"/>
+    <rect x="200" y="80" width="90" height="60" rx="6" fill="#1B2740" stroke="#263352"/>
+    <rect x="30" y="20" width="60" height="30" rx="4" fill="#1B2740" stroke="#263352"/>
+    <text x="24" y="55" fill="#7C8AA5" font-size="9" font-family="monospace">14</text>
+    <text x="290" y="55" fill="#7C8AA5" font-size="9" font-family="monospace">32</text>
+    <text x="215" y="95" fill="#7C8AA5" font-size="9" font-family="monospace">PÁTIO</text>
+    ${highlightRect}
+  </svg>`;
+}
+
+function svgSatellite(level){
+  const cloudColor = level === 'med' ? '#F2A93B' : '#5FA8E8';
+  return `
+  <svg viewBox="0 0 320 200" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="g1" cx="50%" cy="50%" r="60%">
+        <stop offset="0%" stop-color="#152036"/>
+        <stop offset="100%" stop-color="#0B111E"/>
+      </radialGradient>
+    </defs>
+    <rect width="320" height="200" fill="url(#g1)"/>
+    <circle cx="160" cy="100" r="70" fill="none" stroke="#263352" stroke-width="1"/>
+    <circle cx="160" cy="100" r="45" fill="none" stroke="#263352" stroke-width="1"/>
+    <circle cx="160" cy="100" r="3" fill="${cloudColor}"/>
+    <ellipse cx="120" cy="70" rx="38" ry="16" fill="${cloudColor}" opacity="0.25"/>
+    <ellipse cx="190" cy="110" rx="50" ry="20" fill="${cloudColor}" opacity="0.35"/>
+    <ellipse cx="150" cy="130" rx="30" ry="12" fill="${cloudColor}" opacity="0.2"/>
+    <text x="12" y="18" fill="#7C8AA5" font-size="9" font-family="monospace">SATÉLITE · CANAL IV</text>
+  </svg>`;
+}
+
+/* ---------- render principal ---------- */
+
 function render(){
   renderChips();
   const airport = AIRPORTS.find(a => a.code === currentCode);
-  const data = MOCK_DATA[currentCode] || { updated: "—", notices: [] };
+  const main = document.getElementById('main');
 
-  document.getElementById('banner').innerHTML = `
-    <div>
-      <div class="code">${airport.code} · ${airport.uf}</div>
-      <div class="city">${airport.city}</div>
-    </div>
-    <div class="updated">Atualizado<b>${data.updated}</b></div>
-  `;
+  if(currentTab === 'metar' && REAL_METAR[currentCode] === undefined){
+    loadRealMetar(currentCode);
+  }
 
-  const sections = document.getElementById('sections');
-
-  if(data.notices.length === 0){
-    sections.innerHTML = `
-      <div class="empty">
-        <div class="icon">✓</div>
-        Nenhum aviso relevante no momento para este aeroporto.
-      </div>`;
+  if(currentView === 'notam-detail'){
+    renderNotamDetail(main, airport);
+    return;
+  }
+  if(currentView === 'metar-detail'){
+    renderMetarDetail(main, airport);
     return;
   }
 
+  // view padrão: lista
+  let updated = "—";
+  if(currentTab === "notam") updated = (MOCK_NOTAM[currentCode] || {}).updated || "—";
+  if(currentTab === "metar") updated = (getMetarData(currentCode) || {}).updated || "—";
+  if(currentTab === "rotaer") updated = "ficha estática";
+
+  main.innerHTML = `
+    <div class="airport-banner">
+      <div>
+        <div class="code">${airport.code} · ${airport.uf}</div>
+        <div class="city">${airport.city}</div>
+      </div>
+      <div class="updated">Atualizado<b>${updated}</b></div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="sections"></div>
+  `;
+  renderTabs();
+
+  if(currentTab === "notam") renderNotamList(MOCK_NOTAM[currentCode]);
+  if(currentTab === "metar") renderMetarSummary(getMetarData(currentCode));
+  if(currentTab === "rotaer") renderRotaer(MOCK_ROTAER[currentCode]);
+}
+
+function renderTabs(){
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = "";
+  TABS.forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (t.id === currentTab ? ' active' : '');
+    el.textContent = t.label;
+    el.onclick = () => { currentTab = t.id; render(); };
+    tabs.appendChild(el);
+  });
+}
+
+function renderNotamList(data){
+  const sections = document.getElementById('sections');
+  if(!data || data.notices.length === 0){
+    sections.innerHTML = `<div class="empty"><div class="icon">✓</div>Nenhum aviso relevante no momento para este aeroporto.</div>`;
+    return;
+  }
   sections.innerHTML = `<div class="section-label">Avisos ativos · ${data.notices.length}</div>` +
     data.notices.map((n, i) => `
       <div class="card ${n.level}">
@@ -392,10 +806,142 @@ function render(){
           <span>${n.category}</span>
           <span>Válido: ${n.validity}</span>
         </div>
-        <div class="toggle-raw" onclick="toggleRaw(${i})" id="toggle-${i}">Ver texto original (NOTAM)</div>
+        <div class="link-row">
+          <div class="toggle-raw" onclick="toggleRaw(${i})" id="toggle-${i}">Texto original</div>
+          <div class="link-detail" onclick="openNotamDetail(${i})">Ver carta e detalhes</div>
+        </div>
         <div class="raw-box" id="raw-${i}">${n.raw}</div>
       </div>
     `).join('');
+}
+
+function renderMetarSummary(data){
+  const sections = document.getElementById('sections');
+  if(!data){
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Sem dados meteorológicos no momento.</div>`;
+    return;
+  }
+  sections.innerHTML = `
+    <div class="section-label">Condições atuais · atualizado ${data.updated}</div>
+    ${sourceTagHtml(data.source)}
+    <div class="card ${data.level}" style="margin-bottom:14px;">
+      <div class="card-top">
+        <div class="card-title">${data.condition}</div>
+        <div class="badge ${data.level}">${levelLabel(data.level)}</div>
+      </div>
+    </div>
+    <div class="metar-grid">
+      <div class="metar-stat"><div class="label">Vento</div><div class="value">${data.wind} <span>${data.windSpeed}</span></div></div>
+      <div class="metar-stat"><div class="label">Visibilidade</div><div class="value">${data.visibility}</div></div>
+      <div class="metar-stat"><div class="label">Nuvens</div><div class="value" style="font-size:14px;">${data.clouds}</div></div>
+      <div class="metar-stat"><div class="label">Temperatura</div><div class="value">${data.temp} <span>orvalho ${data.dew}</span></div></div>
+      <div class="metar-stat" style="grid-column: span 2;"><div class="label">Pressão (QNH)</div><div class="value">${data.qnh}</div></div>
+    </div>
+    <div class="link-row">
+      <div class="toggle-raw" onclick="toggleRaw('metar')" id="toggle-metar">Texto original</div>
+      <div class="link-detail" onclick="openMetarDetail()">Ver imagem e detalhes técnicos</div>
+    </div>
+    <div class="raw-box" id="raw-metar">${data.raw}</div>
+  `;
+}
+
+function renderRotaer(data){
+  const sections = document.getElementById('sections');
+  if(!data){
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Sem ficha ROTAER disponível.</div>`;
+    return;
+  }
+  const rows = [
+    ["Nome oficial", data.nome], ["Elevação", data.elevacao], ["Pista", data.pista],
+    ["Horário de funcionamento", data.horario], ["Frequência Torre", data.freqTorre],
+    ["Frequência Aproximação", data.freqAproximacao], ["Combustível disponível", data.combustivel],
+  ];
+  sections.innerHTML = `
+    <div class="section-label">Ficha do aeródromo</div>
+    <div class="rotaer-card">
+      ${rows.map(([k,v]) => `<div class="rotaer-row"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
+    </div>
+  `;
+}
+
+/* ---------- sub-páginas de detalhe (camada 2) ---------- */
+
+function openNotamDetail(i){
+  currentNotamIndex = i;
+  currentView = 'notam-detail';
+  render();
+}
+function openMetarDetail(){
+  currentView = 'metar-detail';
+  render();
+}
+function backToList(){
+  currentView = 'list';
+  render();
+}
+
+function renderNotamDetail(main, airport){
+  const n = MOCK_NOTAM[currentCode].notices[currentNotamIndex];
+  main.innerHTML = `
+    <div class="back-btn" onclick="backToList()">voltar</div>
+    <div class="detail-header">
+      <div class="d-title">${n.title}</div>
+      <div class="d-meta">
+        <span>${airport.code} · ${n.category}</span>
+        <span>Válido: ${n.validity}</span>
+      </div>
+    </div>
+
+    <div class="section-label">Carta do aeródromo</div>
+    <div class="image-frame">${svgRunwayChart(n.affected)}</div>
+    <div class="image-caption">Diagrama ilustrativo com a área destacada em vermelho. <b>Em produção, viria da carta oficial (serviço "cartas" da API-AISWEB).</b></div>
+
+    <div class="section-label">Em linguagem simples</div>
+    <div class="plain-block">${n.full}</div>
+
+    <div class="section-label">Texto original (NOTAM)</div>
+    <div class="raw-box show" style="margin-bottom:16px;">${n.raw}</div>
+  `;
+}
+
+function renderMetarDetail(main, airport){
+  const d = getMetarData(currentCode);
+  const techRows = [
+    { code: d.raw.split(' ')[2] || '', t: 'Data e hora', d: 'Dia e horário (UTC) da observação' },
+    { code: d.wind + ' / ' + d.windSpeed, t: 'Vento', d: 'Direção de onde o vento sopra e sua intensidade' },
+    { code: d.visibility, t: 'Visibilidade horizontal', d: 'Distância máxima enxergada na horizontal' },
+    { code: d.clouds, t: 'Nebulosidade', d: 'Quantidade e altura da base das nuvens' },
+    { code: d.temp + ' / ' + d.dew, t: 'Temperatura / ponto de orvalho', d: 'Quanto mais próximos, maior a chance de neblina' },
+    { code: d.qnh, t: 'Pressão QNH', d: 'Usada pelos pilotos para calibrar o altímetro' },
+  ];
+  main.innerHTML = `
+    <div class="back-btn" onclick="backToList()">voltar</div>
+    <div class="detail-header">
+      <div class="d-title">${airport.city} — imagem e leitura técnica</div>
+      <div class="d-meta"><span>${airport.code}</span><span>Atualizado ${d.updated}</span></div>
+    </div>
+    ${sourceTagHtml(d.source)}
+
+    <div class="section-label">Imagem de satélite</div>
+    <div class="image-frame">${svgSatellite(d.level)}</div>
+    <div class="image-caption">Ilustração de exemplo (a imagem de satélite real ainda depende de outro endpoint da API-REDEMET).</div>
+
+    <div class="section-label">Em linguagem simples</div>
+    <div class="plain-block">${d.condition}. Vento de ${d.wind} a ${d.windSpeed}, visibilidade de ${d.visibility} e ${d.clouds.toLowerCase()}. Temperatura de ${d.temp}, com pressão de ${d.qnh}.</div>
+
+    <div class="section-label">Leitura campo a campo</div>
+    <div class="tech-table">
+      ${techRows.map(r => `
+        <div class="tech-row">
+          <div class="tech-code">${r.code}</div>
+          <div class="tech-mean"><div class="t">${r.t}</div><div class="d">${r.d}</div></div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="section-label">Texto original (METAR)</div>
+    <div class="raw-box show" style="margin-bottom:16px;">${d.raw}</div>
+  `;
 }
 
 function toggleRaw(i){
@@ -406,11 +952,8 @@ function toggleRaw(i){
 document.getElementById('searchInput').addEventListener('input', (e) => {
   const q = e.target.value.trim().toLowerCase();
   if(!q) return;
-  const match = AIRPORTS.find(a =>
-    a.code.toLowerCase().includes(q) ||
-    a.city.toLowerCase().includes(q)
-  );
-  if(match){ currentCode = match.code; render(); }
+  const match = AIRPORTS.find(a => a.code.toLowerCase().includes(q) || a.city.toLowerCase().includes(q));
+  if(match){ currentCode = match.code; currentView='list'; render(); }
 });
 
 render();
