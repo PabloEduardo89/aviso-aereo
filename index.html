@@ -476,12 +476,49 @@ const metarLoading = {};
 let REAL_SATELITE = undefined;
 let sateliteLoading = false;
 
+// aeroportos com ficha completa (NOTAM/METAR/ROTAER de exemplo) — também usados como chips de sugestão
+const FEATURED_CODES = ["SBFL", "SBGR", "SBRJ", "SBBR", "SBCF"];
+
+// todas as capitais + principais hubs do Brasil, para a busca encontrar qualquer um deles.
+// METAR real (REDEMET) funciona para qualquer ICAO aqui; NOTAM/ROTAER ficam com aviso de
+// "ainda não integrado" até termos a API-AISWEB e uma ficha ROTAER própria de cada um.
 const AIRPORTS = [
   { code: "SBFL", city: "Florianópolis", uf: "SC" },
   { code: "SBGR", city: "Guarulhos (São Paulo)", uf: "SP" },
   { code: "SBRJ", city: "Santos Dumont (Rio de Janeiro)", uf: "RJ" },
   { code: "SBBR", city: "Brasília", uf: "DF" },
   { code: "SBCF", city: "Confins (Belo Horizonte)", uf: "MG" },
+  { code: "SBRB", city: "Rio Branco", uf: "AC" },
+  { code: "SBMO", city: "Maceió", uf: "AL" },
+  { code: "SBMQ", city: "Macapá", uf: "AP" },
+  { code: "SBEG", city: "Manaus", uf: "AM" },
+  { code: "SBSV", city: "Salvador", uf: "BA" },
+  { code: "SBFZ", city: "Fortaleza", uf: "CE" },
+  { code: "SBVT", city: "Vitória", uf: "ES" },
+  { code: "SBGO", city: "Goiânia", uf: "GO" },
+  { code: "SBSL", city: "São Luís", uf: "MA" },
+  { code: "SBCY", city: "Cuiabá", uf: "MT" },
+  { code: "SBCG", city: "Campo Grande", uf: "MS" },
+  { code: "SBBE", city: "Belém", uf: "PA" },
+  { code: "SBJP", city: "João Pessoa", uf: "PB" },
+  { code: "SBCT", city: "Curitiba", uf: "PR" },
+  { code: "SBRF", city: "Recife", uf: "PE" },
+  { code: "SBTE", city: "Teresina", uf: "PI" },
+  { code: "SBGL", city: "Galeão (Rio de Janeiro)", uf: "RJ" },
+  { code: "SBSG", city: "Natal", uf: "RN" },
+  { code: "SBPA", city: "Porto Alegre", uf: "RS" },
+  { code: "SBPV", city: "Porto Velho", uf: "RO" },
+  { code: "SBBV", city: "Boa Vista", uf: "RR" },
+  { code: "SBSP", city: "Congonhas (São Paulo)", uf: "SP" },
+  { code: "SBAR", city: "Aracaju", uf: "SE" },
+  { code: "SBPJ", city: "Palmas", uf: "TO" },
+  { code: "SBKP", city: "Campinas", uf: "SP" },
+  { code: "SBFI", city: "Foz do Iguaçu", uf: "PR" },
+  { code: "SBJV", city: "Joinville", uf: "SC" },
+  { code: "SBNF", city: "Navegantes", uf: "SC" },
+  { code: "SBRP", city: "Ribeirão Preto", uf: "SP" },
+  { code: "SBRD", city: "Rondonópolis", uf: "MT" },
+  { code: "SBIZ", city: "Imperatriz", uf: "MA" },
 ];
 
 const TABS = [
@@ -737,7 +774,11 @@ function levelLabel(l){
 function renderChips(){
   const chips = document.getElementById('chips');
   chips.innerHTML = "";
-  AIRPORTS.forEach(a => {
+  // chips mostram só os destacados; se a busca levou a outro aeroporto, ele aparece também
+  const codes = FEATURED_CODES.includes(currentCode) ? FEATURED_CODES : [currentCode, ...FEATURED_CODES];
+  codes.forEach(code => {
+    const a = AIRPORTS.find(x => x.code === code);
+    if(!a) return;
     const el = document.createElement('div');
     el.className = 'chip' + (a.code === currentCode ? ' active' : '');
     el.textContent = a.code;
@@ -851,7 +892,11 @@ function renderTabs(){
 
 function renderNotamList(data){
   const sections = document.getElementById('sections');
-  if(!data || data.notices.length === 0){
+  if(!data){
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>NOTAM real ainda não disponível para este aeroporto (aguardando integração com a API-AISWEB).</div>`;
+    return;
+  }
+  if(data.notices.length === 0){
     sections.innerHTML = `<div class="empty"><div class="icon">✓</div>Nenhum aviso relevante no momento para este aeroporto.</div>`;
     return;
   }
@@ -1039,10 +1084,16 @@ function toggleRaw(i){
   document.getElementById(`toggle-${i}`).classList.toggle('open');
 }
 
+// remove acentos para a busca não depender de o usuário digitar acentuação exata
+const DIACRITICS_REGEX = new RegExp('[' + String.fromCharCode(0x0300) + '-' + String.fromCharCode(0x036f) + ']', 'g');
+function normalizeSearch(s){
+  return s.normalize('NFD').replace(DIACRITICS_REGEX, '').toLowerCase().trim();
+}
+
 document.getElementById('searchInput').addEventListener('input', (e) => {
-  const q = e.target.value.trim().toLowerCase();
+  const q = normalizeSearch(e.target.value);
   if(!q) return;
-  const match = AIRPORTS.find(a => a.code.toLowerCase().includes(q) || a.city.toLowerCase().includes(q));
+  const match = AIRPORTS.find(a => normalizeSearch(a.code).includes(q) || normalizeSearch(a.city).includes(q));
   if(match){ currentCode = match.code; currentView='list'; render(); }
 });
 
@@ -1053,10 +1104,10 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 const AUTO_REFRESH_MS = 10 * 60 * 1000; // 10 minutos
 
 function refreshAllRealData(){
-  AIRPORTS.forEach(a => {
-    REAL_METAR[a.code] = undefined;
-    loadRealMetar(a.code);
-  });
+  // com dezenas de aeroportos cadastrados, só vale a pena manter fresco
+  // o que está sendo exibido agora — evita bater na API à toa pros outros
+  REAL_METAR[currentCode] = undefined;
+  loadRealMetar(currentCode);
   REAL_SATELITE = undefined;
   loadRealSatelite();
 }
