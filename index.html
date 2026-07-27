@@ -461,10 +461,10 @@
    CONFIGURAÇÃO — API-REDEMET (DECEA)
    ========================================================= */
 const REDEMET_API_KEY = "fCgPZoKnuHWCzkXx5OAJDDXVTxXQLP9x6DKqWmHq";
-// Domínio confirmado por e-mail junto com a chave. A documentação pública
-// também referencia api-redemet.decea.mil.br — se este domínio parar de
-// responder, tente trocar por esse.
-const REDEMET_BASE = "https://api-redemet.decea.gov.br";
+// api-redemet.decea.gov.br responde com redirect 301 para o domínio abaixo,
+// e esse redirect não carrega headers de CORS — quebra o fetch no navegador.
+// Por isso usamos o domínio .mil.br diretamente (responde 200 com CORS liberado).
+const REDEMET_BASE = "https://api-redemet.decea.mil.br";
 
 // cache de dados reais buscados na API-REDEMET, por código ICAO
 // undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
@@ -574,9 +574,10 @@ const MOCK_ROTAER = {
    ========================================================= */
 function pad(n){ return n.toString().padStart(2,'0'); }
 
+// formato exigido pela API-REDEMET: YYYYMMDDHH (sem minutos)
 function nowUTCString(offsetHours){
   const d = new Date(Date.now() + (offsetHours||0)*3600*1000);
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}`;
+  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}${pad(d.getUTCHours())}`;
 }
 
 function timeAgo(dateStr){
@@ -658,8 +659,10 @@ async function loadRealMetar(icao){
   try{
     const dataFim = nowUTCString(0);
     const dataIni = nowUTCString(-6); // últimas 6h, pega a mensagem mais recente disponível
-    const url = `${REDEMET_BASE}/mensagens/metar/${icao}?data_ini=${dataIni}&data_fim=${dataFim}`;
-    const resp = await fetch(url, { headers: { 'X-Api-Key': REDEMET_API_KEY } });
+    // api_key vai na URL (não como header custom) para não disparar preflight CORS,
+    // que a API do DECEA rejeita com 403 API_KEY_MISSING
+    const url = `${REDEMET_BASE}/mensagens/metar/${icao}?data_ini=${dataIni}&data_fim=${dataFim}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
+    const resp = await fetch(url);
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     const list = (json && json.data && json.data.data) || [];
@@ -687,8 +690,10 @@ async function loadRealSatelite(){
   if(sateliteLoading || REAL_SATELITE !== undefined) return;
   sateliteLoading = true;
   try{
+    // api_key vai na URL (não como header custom) para não disparar preflight CORS,
+    // que a API do DECEA rejeita com 403 API_KEY_MISSING
     const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=3&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
-    const resp = await fetch(url, { headers: { 'X-Api-Key': REDEMET_API_KEY } });
+    const resp = await fetch(url);
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     const list = (json && json.data && json.data.satelite) || [];
