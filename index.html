@@ -151,6 +151,30 @@
     color: #151515;
   }
 
+  /* sub-abas (dentro de uma aba principal, ex.: METAR > Resumo / Imagem) */
+  .subtabs{
+    display:flex;
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .subtab{
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor:pointer;
+    user-select:none;
+    transition: all .15s ease;
+  }
+  .subtab:hover{ color: var(--text); }
+  .subtab.active{
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(242,169,59,0.1);
+  }
+
   .section-label{
     font-size: 11px;
     text-transform: uppercase;
@@ -429,7 +453,7 @@
 <main id="main"></main>
 
 <div class="footnote">
-  Protótipo · NOTAM/ROTAER com dados de exemplo · METAR conectado à API-REDEMET (DECEA)
+  Protótipo · NOTAM/ROTAER com dados de exemplo · METAR e imagem de satélite conectados à API-REDEMET (DECEA)
 </div>
 
 <script>
@@ -446,6 +470,11 @@ const REDEMET_BASE = "https://api-redemet.decea.gov.br";
 // undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
 const REAL_METAR = {};
 const metarLoading = {};
+
+// imagem de satélite é um produto único (cobertura do Brasil), não varia por aeroporto
+// undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
+let REAL_SATELITE = undefined;
+let sateliteLoading = false;
 
 const AIRPORTS = [
   { code: "SBFL", city: "Florianópolis", uf: "SC" },
@@ -654,6 +683,35 @@ function getMetarData(icao){
   return MOCK_METAR[icao] ? { ...MOCK_METAR[icao], source: 'loading' } : null;
 }
 
+async function loadRealSatelite(){
+  if(sateliteLoading || REAL_SATELITE !== undefined) return;
+  sateliteLoading = true;
+  try{
+    const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=3&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
+    const resp = await fetch(url, { headers: { 'X-Api-Key': REDEMET_API_KEY } });
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const list = (json && json.data && json.data.satelite) || [];
+    if(list.length === 0) throw new Error('sem imagens de satélite disponíveis no momento');
+    const ultima = list[list.length - 1];
+    REAL_SATELITE = { path: ultima.path, updated: timeAgo(ultima.data) };
+  }catch(err){
+    console.warn('Falha ao buscar imagem de satélite da REDEMET', err);
+    REAL_SATELITE = null; // marca como "tentou e falhou" -> cai no placeholder ilustrativo
+  }finally{
+    sateliteLoading = false;
+    if(currentTab === 'metar' && metarSubTab === 'imagem'){
+      render();
+    }
+  }
+}
+
+function getSateliteData(){
+  if(REAL_SATELITE) return { ...REAL_SATELITE, source: 'real' };
+  if(REAL_SATELITE === null) return { source: 'fallback' };
+  return { source: 'loading' };
+}
+
 function sourceTagHtml(source){
   if(source === 'real') return `<div class="source-tag real"><span class="dot"></span>Dado real — API-REDEMET</div>`;
   if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado real da REDEMET...</div>`;
@@ -663,8 +721,9 @@ function sourceTagHtml(source){
 
 let currentCode = "SBFL";
 let currentTab = "notam";
-let currentView = "list";   // 'list' | 'notam-detail' | 'metar-detail'
+let currentView = "list";   // 'list' | 'notam-detail'
 let currentNotamIndex = 0;
+let metarSubTab = "resumo"; // 'resumo' | 'imagem'
 
 function levelLabel(l){
   return l === "high" ? "Atenção" : l === "med" ? "Aviso" : l === "info" ? "Info" : "Informativo";
@@ -740,13 +799,12 @@ function render(){
   if(currentTab === 'metar' && REAL_METAR[currentCode] === undefined){
     loadRealMetar(currentCode);
   }
+  if(currentTab === 'metar' && metarSubTab === 'imagem' && REAL_SATELITE === undefined){
+    loadRealSatelite();
+  }
 
   if(currentView === 'notam-detail'){
     renderNotamDetail(main, airport);
-    return;
-  }
-  if(currentView === 'metar-detail'){
-    renderMetarDetail(main, airport);
     return;
   }
 
@@ -770,7 +828,7 @@ function render(){
   renderTabs();
 
   if(currentTab === "notam") renderNotamList(MOCK_NOTAM[currentCode]);
-  if(currentTab === "metar") renderMetarSummary(getMetarData(currentCode));
+  if(currentTab === "metar") renderMetarSection(airport);
   if(currentTab === "rotaer") renderRotaer(MOCK_ROTAER[currentCode]);
 }
 
@@ -815,13 +873,42 @@ function renderNotamList(data){
     `).join('');
 }
 
-function renderMetarSummary(data){
+function renderMetarSection(airport){
   const sections = document.getElementById('sections');
+  sections.innerHTML = `
+    <div class="subtabs" id="metarSubtabs"></div>
+    <div id="metarSubContent"></div>
+  `;
+  renderMetarSubtabs();
+
+  const data = getMetarData(currentCode);
+  if(metarSubTab === 'imagem') renderMetarImagem(data);
+  else renderMetarResumo(data);
+}
+
+function renderMetarSubtabs(){
+  const wrap = document.getElementById('metarSubtabs');
+  const subs = [
+    { id: 'resumo', label: 'Resumo' },
+    { id: 'imagem', label: 'Imagem de satélite' },
+  ];
+  wrap.innerHTML = '';
+  subs.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'subtab' + (s.id === metarSubTab ? ' active' : '');
+    el.textContent = s.label;
+    el.onclick = () => { metarSubTab = s.id; render(); };
+    wrap.appendChild(el);
+  });
+}
+
+function renderMetarResumo(data){
+  const content = document.getElementById('metarSubContent');
   if(!data){
-    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Sem dados meteorológicos no momento.</div>`;
+    content.innerHTML = `<div class="empty"><div class="icon">—</div>Sem dados meteorológicos no momento.</div>`;
     return;
   }
-  sections.innerHTML = `
+  content.innerHTML = `
     <div class="section-label">Condições atuais · atualizado ${data.updated}</div>
     ${sourceTagHtml(data.source)}
     <div class="card ${data.level}" style="margin-bottom:14px;">
@@ -839,9 +926,51 @@ function renderMetarSummary(data){
     </div>
     <div class="link-row">
       <div class="toggle-raw" onclick="toggleRaw('metar')" id="toggle-metar">Texto original</div>
-      <div class="link-detail" onclick="openMetarDetail()">Ver imagem e detalhes técnicos</div>
     </div>
     <div class="raw-box" id="raw-metar">${data.raw}</div>
+  `;
+}
+
+function renderMetarImagem(metarData){
+  const content = document.getElementById('metarSubContent');
+  const sat = getSateliteData();
+  const level = metarData ? metarData.level : 'low';
+
+  const frame = sat.source === 'real'
+    ? `<img src="${sat.path}" alt="Imagem de satélite REDEMET" style="width:100%; height:auto; display:block; border-radius:8px;">`
+    : svgSatellite(level);
+
+  const caption = sat.source === 'real'
+    ? `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA · atualizada ${sat.updated}.`
+    : sat.source === 'loading'
+      ? 'Carregando imagem real de satélite da REDEMET...'
+      : 'Ilustração de exemplo — não foi possível carregar a imagem real da REDEMET no momento.';
+
+  content.innerHTML = `
+    <div class="section-label">Imagem de satélite · Brasil</div>
+    ${sourceTagHtml(sat.source === 'loading' ? 'loading' : (sat.source === 'real' ? 'real' : 'fallback'))}
+    <div class="image-frame">${frame}</div>
+    <div class="image-caption">${caption}</div>
+    ${metarData ? `
+      <div class="section-label">Leitura campo a campo</div>
+      <div class="tech-table">
+        ${[
+          { code: metarData.raw.split(' ')[2] || '', t: 'Data e hora', d: 'Dia e horário (UTC) da observação' },
+          { code: metarData.wind + ' / ' + metarData.windSpeed, t: 'Vento', d: 'Direção de onde o vento sopra e sua intensidade' },
+          { code: metarData.visibility, t: 'Visibilidade horizontal', d: 'Distância máxima enxergada na horizontal' },
+          { code: metarData.clouds, t: 'Nebulosidade', d: 'Quantidade e altura da base das nuvens' },
+          { code: metarData.temp + ' / ' + metarData.dew, t: 'Temperatura / ponto de orvalho', d: 'Quanto mais próximos, maior a chance de neblina' },
+          { code: metarData.qnh, t: 'Pressão QNH', d: 'Usada pelos pilotos para calibrar o altímetro' },
+        ].map(r => `
+          <div class="tech-row">
+            <div class="tech-code">${r.code}</div>
+            <div class="tech-mean"><div class="t">${r.t}</div><div class="d">${r.d}</div></div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="section-label">Texto original (METAR)</div>
+      <div class="raw-box show" style="margin-bottom:16px;">${metarData.raw}</div>
+    ` : ''}
   `;
 }
 
@@ -871,10 +1000,6 @@ function openNotamDetail(i){
   currentView = 'notam-detail';
   render();
 }
-function openMetarDetail(){
-  currentView = 'metar-detail';
-  render();
-}
 function backToList(){
   currentView = 'list';
   render();
@@ -901,46 +1026,6 @@ function renderNotamDetail(main, airport){
 
     <div class="section-label">Texto original (NOTAM)</div>
     <div class="raw-box show" style="margin-bottom:16px;">${n.raw}</div>
-  `;
-}
-
-function renderMetarDetail(main, airport){
-  const d = getMetarData(currentCode);
-  const techRows = [
-    { code: d.raw.split(' ')[2] || '', t: 'Data e hora', d: 'Dia e horário (UTC) da observação' },
-    { code: d.wind + ' / ' + d.windSpeed, t: 'Vento', d: 'Direção de onde o vento sopra e sua intensidade' },
-    { code: d.visibility, t: 'Visibilidade horizontal', d: 'Distância máxima enxergada na horizontal' },
-    { code: d.clouds, t: 'Nebulosidade', d: 'Quantidade e altura da base das nuvens' },
-    { code: d.temp + ' / ' + d.dew, t: 'Temperatura / ponto de orvalho', d: 'Quanto mais próximos, maior a chance de neblina' },
-    { code: d.qnh, t: 'Pressão QNH', d: 'Usada pelos pilotos para calibrar o altímetro' },
-  ];
-  main.innerHTML = `
-    <div class="back-btn" onclick="backToList()">voltar</div>
-    <div class="detail-header">
-      <div class="d-title">${airport.city} — imagem e leitura técnica</div>
-      <div class="d-meta"><span>${airport.code}</span><span>Atualizado ${d.updated}</span></div>
-    </div>
-    ${sourceTagHtml(d.source)}
-
-    <div class="section-label">Imagem de satélite</div>
-    <div class="image-frame">${svgSatellite(d.level)}</div>
-    <div class="image-caption">Ilustração de exemplo (a imagem de satélite real ainda depende de outro endpoint da API-REDEMET).</div>
-
-    <div class="section-label">Em linguagem simples</div>
-    <div class="plain-block">${d.condition}. Vento de ${d.wind} a ${d.windSpeed}, visibilidade de ${d.visibility} e ${d.clouds.toLowerCase()}. Temperatura de ${d.temp}, com pressão de ${d.qnh}.</div>
-
-    <div class="section-label">Leitura campo a campo</div>
-    <div class="tech-table">
-      ${techRows.map(r => `
-        <div class="tech-row">
-          <div class="tech-code">${r.code}</div>
-          <div class="tech-mean"><div class="t">${r.t}</div><div class="d">${r.d}</div></div>
-        </div>
-      `).join('')}
-    </div>
-
-    <div class="section-label">Texto original (METAR)</div>
-    <div class="raw-box show" style="margin-bottom:16px;">${d.raw}</div>
   `;
 }
 
