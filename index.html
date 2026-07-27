@@ -1046,6 +1046,23 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
   if(match){ currentCode = match.code; currentView='list'; render(); }
 });
 
+/* =========================================================
+   ATUALIZAÇÃO AUTOMÁTICA — em segundo plano, mesmo intervalo
+   com que a REDEMET renova satélite/METAR na prática
+   ========================================================= */
+const AUTO_REFRESH_MS = 10 * 60 * 1000; // 10 minutos
+
+function refreshAllRealData(){
+  AIRPORTS.forEach(a => {
+    REAL_METAR[a.code] = undefined;
+    loadRealMetar(a.code);
+  });
+  REAL_SATELITE = undefined;
+  loadRealSatelite();
+}
+
+setInterval(refreshAllRealData, AUTO_REFRESH_MS);
+
 render();
 </script>
 </body>
