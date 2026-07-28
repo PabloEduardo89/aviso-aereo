@@ -175,6 +175,81 @@
     background: rgba(242,169,59,0.1);
   }
 
+  /* seletor de data do METAR (tempo real x histórico) */
+  .date-nav{ margin-bottom:16px; }
+  .date-toggle{
+    display:flex; gap:6px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 10px;
+  }
+  .date-opt{
+    flex:1; text-align:center;
+    padding: 8px 8px;
+    border-radius: 9px;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--muted);
+    cursor:pointer;
+    user-select:none;
+    transition: all .15s ease;
+  }
+  .date-opt:hover{ color: var(--text); }
+  .date-opt.active{ background: var(--amber); color:#151515; }
+
+  .date-picker{
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .date-input{
+    width:100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+    outline:none;
+    color-scheme: dark;
+    font-family: 'Public Sans', 'Segoe UI', Arial, sans-serif;
+  }
+  .date-input:focus{ border-color: var(--amber); }
+
+  .hour-scroll{
+    display:flex; gap:6px;
+    margin-top:10px;
+    overflow-x:auto;
+    padding-bottom:2px;
+  }
+  .hour-scroll::-webkit-scrollbar{ height:4px; }
+  .hour-scroll::-webkit-scrollbar-thumb{ background: var(--line); border-radius:4px; }
+  .hour-chip{
+    flex-shrink:0;
+    padding: 7px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    cursor:pointer;
+    user-select:none;
+    transition: all .15s ease;
+  }
+  .hour-chip:hover{ color: var(--text); }
+  .hour-chip.active{
+    border-color: var(--amber);
+    color: var(--amber);
+    background: rgba(242,169,59,0.1);
+  }
+  .hour-hint{
+    font-size:12px; color: var(--muted); padding: 4px 2px;
+  }
+
   .section-label{
     font-size: 11px;
     text-transform: uppercase;
@@ -476,6 +551,14 @@ const metarLoading = {};
 let REAL_SATELITE = undefined;
 let sateliteLoading = false;
 
+// cache de consultas históricas (METAR de um dia inteiro / satélite de um horário exato)
+// chave METAR: "ICAO_YYYY-MM-DD" -> undefined | null | [{hour, recebimento, parsed}]
+// chave satélite: "YYYY-MM-DD_HH" -> undefined | null | {path, updated}
+const HISTORIC_METAR = {};
+const historicMetarLoading = {};
+const HISTORIC_SATELLITE = {};
+const historicSateliteLoading = {};
+
 // aeroportos com ficha completa (NOTAM/METAR/ROTAER de exemplo) — também usados como chips de sugestão
 const FEATURED_CODES = ["SBFL", "SBGR", "SBRJ", "SBBR", "SBCF"];
 
@@ -519,6 +602,7 @@ const AIRPORTS = [
   { code: "SBRP", city: "Ribeirão Preto", uf: "SP" },
   { code: "SBRD", city: "Rondonópolis", uf: "MT" },
   { code: "SBIZ", city: "Imperatriz", uf: "MA" },
+  { code: "SBLO", city: "Londrina", uf: "PR" },
 ];
 
 const TABS = [
@@ -627,10 +711,29 @@ function timeAgo(dateStr){
   return `há ${Math.round(diffMin/60)}h`;
 }
 
+// data de hoje em UTC (mesmo fuso usado pelas mensagens METAR e pelo campo "max" do date picker)
+function todayUTCDateStr(){
+  const d = new Date();
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
+}
+
+// "2026-07-27 14:00:00" -> "27/07/2026 14:00 UTC"
+function formatUTCLabel(dateStr){
+  const [datePart, timePart] = dateStr.split(' ');
+  const [y, m, d] = datePart.split('-');
+  return `${d}/${m}/${y} ${(timePart||'00:00:00').slice(0,5)} UTC`;
+}
+
 const CLOUD_NAMES = { FEW:'Poucas nuvens', SCT:'Nuvens esparsas', BKN:'Nublado', OVC:'Encoberto' };
 const WX_MAP = { BR:'neblina', FG:'nevoeiro', RA:'chuva', TS:'trovoada', DZ:'garoa', SN:'neve', HZ:'neblina seca', FU:'fumaça' };
 
 function parseMetarRaw(mens, recebimento){
+  return { ...parseMetarFields(mens), updated: timeAgo(recebimento) };
+}
+
+// parsing puro do texto METAR, sem depender de "quando foi recebido"
+// (usado tanto pelo modo tempo real quanto pelo modo histórico)
+function parseMetarFields(mens){
   const clean = mens.replace('=','').trim();
   const tokens = clean.split(/\s+/);
 
@@ -677,7 +780,6 @@ function parseMetarRaw(mens, recebimento){
   else if(hasStrongWind){ level = 'med'; condition = 'Vento forte — possíveis atrasos'; }
 
   return {
-    updated: timeAgo(recebimento),
     wind: windText,
     windSpeed: windSpeedText,
     visibility: visibilityText,
@@ -718,9 +820,58 @@ async function loadRealMetar(icao){
 }
 
 function getMetarData(icao){
+  if(metarMode === 'historic') return getHistoricMetarData(icao);
   if(REAL_METAR[icao]) return { ...REAL_METAR[icao], source: 'real' };
   if(REAL_METAR[icao] === null) return MOCK_METAR[icao] ? { ...MOCK_METAR[icao], source: 'fallback' } : null;
   return MOCK_METAR[icao] ? { ...MOCK_METAR[icao], source: 'loading' } : null;
+}
+
+// busca na REDEMET todas as mensagens METAR de um dia inteiro (00h-23h UTC) para um aeroporto
+async function loadHistoricMetar(icao, date){
+  const key = `${icao}_${date}`;
+  if(historicMetarLoading[key]) return;
+  historicMetarLoading[key] = true;
+  try{
+    const [y, m, d] = date.split('-');
+    const dataIni = `${y}${m}${d}00`;
+    const dataFim = `${y}${m}${d}23`;
+    const url = `${REDEMET_BASE}/mensagens/metar/${icao}?data_ini=${dataIni}&data_fim=${dataFim}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const list = (json && json.data && json.data.data) || [];
+    if(list.length === 0) throw new Error('sem mensagens nesta data');
+    const records = list.map(item => ({
+      hour: parseInt(item.recebimento.slice(11, 13), 10),
+      recebimento: item.recebimento,
+      parsed: { ...parseMetarFields(item.mens), updated: formatUTCLabel(item.recebimento) }
+    }));
+    HISTORIC_METAR[key] = records;
+    // ao terminar de carregar, seleciona automaticamente o horário mais recente do dia
+    if(historicDate === date && historicHour === null){
+      historicHour = records[records.length - 1].hour;
+    }
+  }catch(err){
+    console.warn('Falha ao buscar METAR histórico da REDEMET para', icao, date, err);
+    HISTORIC_METAR[key] = null;
+  }finally{
+    historicMetarLoading[key] = false;
+    if(currentTab === 'metar' && metarMode === 'historic' && currentCode === icao && historicDate === date){
+      render();
+    }
+  }
+}
+
+function getHistoricMetarData(icao){
+  if(!historicDate) return { source: 'idle' };
+  const key = `${icao}_${historicDate}`;
+  const list = HISTORIC_METAR[key];
+  if(list === undefined) return { source: 'loading' };
+  if(list === null || list.length === 0) return { source: 'empty' };
+  // registro exato do horário escolhido, ou o mais próximo anterior a ele
+  let record = list.find(r => r.hour === historicHour);
+  if(!record) record = [...list].reverse().find(r => r.hour <= historicHour) || list[0];
+  return { ...record.parsed, source: 'historic', hour: record.hour };
 }
 
 async function loadRealSatelite(){
@@ -749,15 +900,52 @@ async function loadRealSatelite(){
 }
 
 function getSateliteData(){
+  if(metarMode === 'historic'){
+    if(!historicDate || historicHour === null) return { source: 'idle' };
+    const key = `${historicDate}_${pad(historicHour)}`;
+    const v = HISTORIC_SATELLITE[key];
+    if(v === undefined) return { source: 'loading' };
+    if(v === null) return { source: 'fallback-historic' };
+    return { ...v, source: 'historic' };
+  }
   if(REAL_SATELITE) return { ...REAL_SATELITE, source: 'real' };
   if(REAL_SATELITE === null) return { source: 'fallback' };
   return { source: 'loading' };
 }
 
+// busca na REDEMET a imagem de satélite mais próxima de um horário exato no passado
+async function loadHistoricSatelite(date, hour){
+  const key = `${date}_${pad(hour)}`;
+  if(historicSateliteLoading[key]) return;
+  historicSateliteLoading[key] = true;
+  try{
+    const [y, m, d] = date.split('-');
+    const dataParam = `${y}${m}${d}${pad(hour)}`;
+    const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=1&data=${dataParam}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const list = (json && json.data && json.data.satelite) || [];
+    if(list.length === 0) throw new Error('sem imagem disponível nesse horário');
+    const img = list[list.length - 1];
+    HISTORIC_SATELLITE[key] = { path: img.path, updated: formatUTCLabel(img.data) };
+  }catch(err){
+    console.warn('Falha ao buscar satélite histórico da REDEMET', date, hour, err);
+    HISTORIC_SATELLITE[key] = null;
+  }finally{
+    historicSateliteLoading[key] = false;
+    if(currentTab === 'metar' && metarSubTab === 'imagem' && metarMode === 'historic' && historicDate === date && historicHour === hour){
+      render();
+    }
+  }
+}
+
 function sourceTagHtml(source){
   if(source === 'real') return `<div class="source-tag real"><span class="dot"></span>Dado real — API-REDEMET</div>`;
-  if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado real da REDEMET...</div>`;
+  if(source === 'historic') return `<div class="source-tag real"><span class="dot"></span>Dado histórico — API-REDEMET</div>`;
+  if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado da REDEMET...</div>`;
   if(source === 'fallback') return `<div class="source-tag fallback"><span class="dot"></span>Dado de exemplo — REDEMET indisponível no momento</div>`;
+  if(source === 'fallback-historic') return `<div class="source-tag fallback"><span class="dot"></span>Imagem indisponível para esse horário</div>`;
   return '';
 }
 
@@ -766,6 +954,11 @@ let currentTab = "notam";
 let currentView = "list";   // 'list' | 'notam-detail'
 let currentNotamIndex = 0;
 let metarSubTab = "resumo"; // 'resumo' | 'imagem'
+
+// consulta de METAR/satélite por data específica (além do tempo real)
+let metarMode = "live";    // 'live' | 'historic'
+let historicDate = null;   // 'YYYY-MM-DD' (UTC)
+let historicHour = null;   // 0-23 (UTC), horário escolhido dentro do dia
 
 function levelLabel(l){
   return l === "high" ? "Atenção" : l === "med" ? "Aviso" : l === "info" ? "Info" : "Informativo";
@@ -842,11 +1035,18 @@ function render(){
   const airport = AIRPORTS.find(a => a.code === currentCode);
   const main = document.getElementById('main');
 
-  if(currentTab === 'metar' && REAL_METAR[currentCode] === undefined){
-    loadRealMetar(currentCode);
-  }
-  if(currentTab === 'metar' && metarSubTab === 'imagem' && REAL_SATELITE === undefined){
-    loadRealSatelite();
+  if(currentTab === 'metar'){
+    if(metarMode === 'live'){
+      if(REAL_METAR[currentCode] === undefined) loadRealMetar(currentCode);
+      if(metarSubTab === 'imagem' && REAL_SATELITE === undefined) loadRealSatelite();
+    } else if(metarMode === 'historic' && historicDate){
+      const mKey = `${currentCode}_${historicDate}`;
+      if(HISTORIC_METAR[mKey] === undefined) loadHistoricMetar(currentCode, historicDate);
+      if(metarSubTab === 'imagem' && historicHour !== null){
+        const sKey = `${historicDate}_${pad(historicHour)}`;
+        if(HISTORIC_SATELLITE[sKey] === undefined) loadHistoricSatelite(historicDate, historicHour);
+      }
+    }
   }
 
   if(currentView === 'notam-detail'){
@@ -926,14 +1126,68 @@ function renderNotamList(data){
 function renderMetarSection(airport){
   const sections = document.getElementById('sections');
   sections.innerHTML = `
+    <div class="date-nav" id="dateNav"></div>
     <div class="subtabs" id="metarSubtabs"></div>
     <div id="metarSubContent"></div>
   `;
+  renderDateNav();
   renderMetarSubtabs();
 
   const data = getMetarData(currentCode);
   if(metarSubTab === 'imagem') renderMetarImagem(data);
   else renderMetarResumo(data);
+}
+
+function renderDateNav(){
+  const wrap = document.getElementById('dateNav');
+  const today = todayUTCDateStr();
+  wrap.innerHTML = `
+    <div class="date-toggle">
+      <div class="date-opt ${metarMode === 'live' ? 'active' : ''}" id="modeLive">Agora</div>
+      <div class="date-opt ${metarMode === 'historic' ? 'active' : ''}" id="modeHistoric">Escolher data</div>
+    </div>
+    ${metarMode === 'historic' ? `
+      <div class="date-picker">
+        <input type="date" id="historicDateInput" class="date-input" max="${today}" value="${historicDate || today}">
+        <div class="hour-scroll" id="hourScroll"></div>
+      </div>
+    ` : ''}
+  `;
+  document.getElementById('modeLive').onclick = () => { metarMode = 'live'; render(); };
+  document.getElementById('modeHistoric').onclick = () => {
+    metarMode = 'historic';
+    if(!historicDate) historicDate = today;
+    render();
+  };
+  if(metarMode === 'historic'){
+    document.getElementById('historicDateInput').onchange = (e) => {
+      historicDate = e.target.value;
+      historicHour = null;
+      render();
+    };
+    renderHourScroll();
+  }
+}
+
+function renderHourScroll(){
+  const wrap = document.getElementById('hourScroll');
+  if(!wrap) return;
+  const key = `${currentCode}_${historicDate}`;
+  const list = HISTORIC_METAR[key];
+  if(list === undefined){
+    wrap.innerHTML = `<div class="hour-hint">Carregando horários disponíveis...</div>`;
+    return;
+  }
+  if(list === null || list.length === 0){
+    wrap.innerHTML = `<div class="hour-hint">Nenhum registro METAR encontrado nesta data.</div>`;
+    return;
+  }
+  wrap.innerHTML = list.map(r => `
+    <div class="hour-chip ${r.hour === historicHour ? 'active' : ''}" data-hour="${r.hour}">${pad(r.hour)}h</div>
+  `).join('');
+  wrap.querySelectorAll('.hour-chip').forEach(el => {
+    el.onclick = () => { historicHour = parseInt(el.dataset.hour, 10); render(); };
+  });
 }
 
 function renderMetarSubtabs(){
@@ -954,12 +1208,17 @@ function renderMetarSubtabs(){
 
 function renderMetarResumo(data){
   const content = document.getElementById('metarSubContent');
-  if(!data){
-    content.innerHTML = `<div class="empty"><div class="icon">—</div>Sem dados meteorológicos no momento.</div>`;
+  if(!data || ['loading','empty','idle'].includes(data.source)){
+    const msg = data && data.source === 'loading' ? 'Carregando METAR...'
+      : data && data.source === 'empty' ? 'Nenhum registro METAR encontrado para esta data.'
+      : data && data.source === 'idle' ? 'Escolha uma data acima para consultar o METAR histórico.'
+      : 'Sem dados meteorológicos no momento.';
+    content.innerHTML = `<div class="empty"><div class="icon">—</div>${msg}</div>`;
     return;
   }
+  const label = data.source === 'historic' ? `Condições em ${data.updated}` : `Condições atuais · atualizado ${data.updated}`;
   content.innerHTML = `
-    <div class="section-label">Condições atuais · atualizado ${data.updated}</div>
+    <div class="section-label">${label}</div>
     ${sourceTagHtml(data.source)}
     <div class="card ${data.level}" style="margin-bottom:14px;">
       <div class="card-top">
@@ -984,24 +1243,30 @@ function renderMetarResumo(data){
 function renderMetarImagem(metarData){
   const content = document.getElementById('metarSubContent');
   const sat = getSateliteData();
-  const level = metarData ? metarData.level : 'low';
+  const level = (metarData && metarData.level) ? metarData.level : 'low';
+  const hasImage = sat.source === 'real' || sat.source === 'historic';
 
-  const frame = sat.source === 'real'
+  const frame = hasImage
     ? `<img src="${sat.path}" alt="Imagem de satélite REDEMET" style="width:100%; height:auto; display:block; border-radius:8px;">`
     : svgSatellite(level);
 
-  const caption = sat.source === 'real'
-    ? `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA · atualizada ${sat.updated}.`
-    : sat.source === 'loading'
-      ? 'Carregando imagem real de satélite da REDEMET...'
-      : 'Ilustração de exemplo — não foi possível carregar a imagem real da REDEMET no momento.';
+  let caption;
+  if(sat.source === 'real') caption = `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA · atualizada ${sat.updated}.`;
+  else if(sat.source === 'historic') caption = `Imagem de satélite real (infravermelho realçado) de <b>${sat.updated}</b>, fornecida pela API-REDEMET/DECEA.`;
+  else if(sat.source === 'loading') caption = 'Carregando imagem de satélite da REDEMET...';
+  else if(sat.source === 'idle') caption = 'Escolha uma data e um horário acima para ver a imagem de satélite daquele momento.';
+  else if(sat.source === 'fallback-historic') caption = 'Ilustração de exemplo — não há imagem de satélite registrada para esse horário exato.';
+  else caption = 'Ilustração de exemplo — não foi possível carregar a imagem real da REDEMET no momento.';
+
+  const tagSource = sat.source === 'idle' ? '' : (sat.source === 'fallback-historic' ? 'fallback' : sat.source);
+  const hasMetarFields = metarData && metarData.raw;
 
   content.innerHTML = `
     <div class="section-label">Imagem de satélite · Brasil</div>
-    ${sourceTagHtml(sat.source === 'loading' ? 'loading' : (sat.source === 'real' ? 'real' : 'fallback'))}
+    ${sourceTagHtml(tagSource)}
     <div class="image-frame">${frame}</div>
     <div class="image-caption">${caption}</div>
-    ${metarData ? `
+    ${hasMetarFields ? `
       <div class="section-label">Leitura campo a campo</div>
       <div class="tech-table">
         ${[
