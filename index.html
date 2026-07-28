@@ -459,6 +459,31 @@
     margin-bottom: 18px;
   }
 
+  /* botão "Gerar Resumo" do METAR em linguagem simples */
+  .btn-summary{
+    display:inline-flex; align-items:center; gap:7px;
+    background: rgba(242,169,59,0.1);
+    border: 1px solid var(--amber-dim);
+    color: var(--amber);
+    font-size: 13px;
+    font-weight: 650;
+    padding: 10px 16px;
+    border-radius: 20px;
+    cursor:pointer;
+    user-select:none;
+    transition: all .15s ease;
+    margin-bottom: 14px;
+  }
+  .btn-summary:hover{ background: rgba(242,169,59,0.18); border-color: var(--amber); }
+  .btn-summary .ic{ font-size:13px; }
+
+  .plain-block.summary{ display:none; }
+  .plain-block.summary.show{ display:block; animation: summaryIn .2s ease; }
+  @keyframes summaryIn{
+    from{ opacity:0; transform:translateY(-4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
   .tech-table{
     background: var(--panel);
     border: 1px solid var(--line);
@@ -790,6 +815,98 @@ function parseMetarFields(mens){
     condition, level,
     raw: clean + '='
   };
+}
+
+/* =========================================================
+   RESUMO EM LINGUAGEM SIMPLES — montado localmente a partir
+   dos campos já traduzidos do METAR (real ou de exemplo),
+   sem depender de nenhuma chamada externa
+   ========================================================= */
+function extractNumber(str){
+  const m = (str || '').match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+function windDirectionLabel(deg){
+  if(deg == null) return null;
+  const dirs = ['norte','nordeste','leste','sudeste','sul','sudoeste','oeste','noroeste'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+function buildMetarPlainSummary(data, airport){
+  const windKtM = (data.windSpeed || '').match(/(\d+)\s*kt/);
+  const gustM = (data.windSpeed || '').match(/rajadas\s*(\d+)\s*kt/);
+  const windKt = windKtM ? parseInt(windKtM[1], 10) : null;
+  const gustKt = gustM ? parseInt(gustM[1], 10) : null;
+  const isVariable = /vari/i.test(data.wind);
+  const windDirDeg = !isVariable && /^\d+/.test(data.wind) ? parseInt(data.wind, 10) : null;
+  const windDirName = windDirectionLabel(windDirDeg);
+
+  const visKm = extractNumber(data.visibility);
+  const hasFogMention = /neblina|nevoeiro/i.test(data.visibility) || /neblina|nevoeiro/i.test(data.clouds);
+
+  const tempNum = extractNumber(data.temp);
+  const dewNum = extractNumber(data.dew);
+  const spread = (tempNum != null && dewNum != null) ? +(tempNum - dewNum).toFixed(1) : null;
+
+  const sentences = [];
+
+  const quando = data.source === 'historic' ? `registrado em ${data.updated}` : `atualizado ${data.updated}`;
+  sentences.push(`Este é o boletim meteorológico do aeroporto de ${airport.city} (${airport.code}), ${quando}.`);
+
+  if(windKt == null){
+    sentences.push(`Não há leitura de vento disponível nesta mensagem.`);
+  } else if(windKt < 3){
+    sentences.push(`O vento está praticamente calmo, o que favorece pousos e decolagens tranquilos.`);
+  } else {
+    const dirText = isVariable ? 'de direção variável' : (windDirName ? `vindo do ${windDirName}` : '');
+    let s = `O vento sopra ${dirText} a ${windKt} nós`;
+    if(gustKt){
+      s += `, com rajadas de até ${gustKt} nós — pode causar leves solavancos durante a aproximação.`;
+    } else if(windKt >= 20){
+      s += `, uma intensidade considerada forte, o que pode exigir mais atenção do piloto no pouso.`;
+    } else {
+      s += `, uma intensidade moderada e sem grande impacto para o voo.`;
+    }
+    sentences.push(s);
+  }
+
+  if(visKm != null){
+    if(visKm >= 8){
+      sentences.push(`A visibilidade está boa, em torno de ${visKm} km, sem restrições para os voos.`);
+    } else if(visKm >= 5){
+      sentences.push(`A visibilidade está em ${visKm} km, um pouco reduzida mas ainda dentro do esperado.`);
+    } else {
+      sentences.push(`A visibilidade está baixa, de apenas ${visKm} km${hasFogMention ? ', por causa de neblina' : ''} — isso pode causar atrasos em pousos.`);
+    }
+  }
+
+  if(/céu limpo/i.test(data.clouds)){
+    sentences.push(`O céu está limpo, sem nuvens significativas.`);
+  } else {
+    sentences.push(`A cobertura de nuvens registrada é: ${data.clouds.toLowerCase()}.`);
+  }
+
+  if(tempNum != null && dewNum != null){
+    let s = `A temperatura está em ${data.temp}, com ponto de orvalho em ${data.dew}`;
+    s += (spread != null && spread <= 3)
+      ? ` — como os dois valores estão próximos, há chance de neblina se formar.`
+      : `.`;
+    sentences.push(s);
+  }
+
+  if(data.qnh && data.qnh !== '—'){
+    sentences.push(`A pressão atmosférica (QNH) está em ${data.qnh}, valor que os pilotos usam para calibrar o altímetro da aeronave.`);
+  }
+
+  const closing = {
+    low: 'No geral, as condições estão boas para voar.',
+    med: 'No geral, vale ficar atento a possíveis pequenos atrasos por causa dessas condições.',
+    high: 'No geral, essas condições podem afetar significativamente a operação do aeroporto.',
+  };
+  sentences.push(closing[data.level] || '');
+
+  return sentences.filter(Boolean).join(' ');
 }
 
 async function loadRealMetar(icao){
@@ -1135,7 +1252,7 @@ function renderMetarSection(airport){
 
   const data = getMetarData(currentCode);
   if(metarSubTab === 'imagem') renderMetarImagem(data);
-  else renderMetarResumo(data);
+  else renderMetarResumo(data, airport);
 }
 
 function renderDateNav(){
@@ -1206,7 +1323,7 @@ function renderMetarSubtabs(){
   });
 }
 
-function renderMetarResumo(data){
+function renderMetarResumo(data, airport){
   const content = document.getElementById('metarSubContent');
   if(!data || ['loading','empty','idle'].includes(data.source)){
     const msg = data && data.source === 'loading' ? 'Carregando METAR...'
@@ -1217,6 +1334,7 @@ function renderMetarResumo(data){
     return;
   }
   const label = data.source === 'historic' ? `Condições em ${data.updated}` : `Condições atuais · atualizado ${data.updated}`;
+  const summaryText = buildMetarPlainSummary(data, airport);
   content.innerHTML = `
     <div class="section-label">${label}</div>
     ${sourceTagHtml(data.source)}
@@ -1226,6 +1344,10 @@ function renderMetarResumo(data){
         <div class="badge ${data.level}">${levelLabel(data.level)}</div>
       </div>
     </div>
+    <div class="btn-summary" onclick="toggleMetarSummary()">
+      <span class="ic">✨</span><span id="btnSummaryLabel">Gerar resumo em linguagem simples</span>
+    </div>
+    <div class="plain-block summary" id="metarSummaryBlock">${summaryText}</div>
     <div class="metar-grid">
       <div class="metar-stat"><div class="label">Vento</div><div class="value">${data.wind} <span>${data.windSpeed}</span></div></div>
       <div class="metar-stat"><div class="label">Visibilidade</div><div class="value">${data.visibility}</div></div>
@@ -1238,6 +1360,13 @@ function renderMetarResumo(data){
     </div>
     <div class="raw-box" id="raw-metar">${data.raw}</div>
   `;
+}
+
+function toggleMetarSummary(){
+  const block = document.getElementById('metarSummaryBlock');
+  const label = document.getElementById('btnSummaryLabel');
+  const showing = block.classList.toggle('show');
+  label.textContent = showing ? 'Ocultar resumo' : 'Gerar resumo em linguagem simples';
 }
 
 function renderMetarImagem(metarData){
