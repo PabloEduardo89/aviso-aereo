@@ -774,37 +774,54 @@ function formatUTCLabel(dateStr){
 }
 
 const CLOUD_NAMES = { FEW:'Poucas nuvens', SCT:'Nuvens esparsas', BKN:'Nublado', OVC:'Encoberto' };
-const WX_INTENSITY_LABEL = { '-':'fraco(a)', '+':'forte' };
-const WX_DESC_LABEL = { MI:'raso(a)', BC:'em banco', PR:'parcial', DR:'baixo, arrastado pelo vento', BL:'soprado(a) em alta pelo vento', SH:'em pancada(s) de', TS:'trovoada', FZ:'congelante' };
 const WX_PHEN_LABEL = { DZ:'garoa', RA:'chuva', SN:'neve', SG:'grãos de neve', IC:'cristais de gelo', PL:'grânulos de gelo', GR:'granizo', GS:'granizo pequeno', UP:'precipitação não identificada', BR:'neblina', FG:'nevoeiro', FU:'fumaça', VA:'cinza vulcânica', DU:'poeira', SA:'areia', HZ:'neblina seca', PY:'borrifo', PO:'redemoinho de poeira/areia', SQ:'rajada forte (squall)', FC:'tromba d\'água/tornado', SS:'tempestade de areia', DS:'tempestade de poeira' };
+// gênero gramatical do substantivo de cada fenômeno, só pra concordância de "fraco/fraca" no texto
+const WX_PHEN_GENDER = { DZ:'f', RA:'f', SN:'f', BR:'f', FG:'m', FU:'f', HZ:'f', GR:'m', SG:'m', IC:'m', PL:'m', GS:'m', VA:'f', DU:'f', SA:'f', PY:'m', PO:'m', SQ:'f', FC:'f', SS:'f', DS:'f', UP:'f' };
 const SEVERE_WX_CODES = ['GR','FC','SS','DS','SQ'];
+// como combinar descritor + fenômeno em português correto (cada código tem uma regência própria,
+// não dá pra só concatenar palavras — "chuva congelante" e "nevoeiro raso" seguem ordens diferentes)
+const WX_DESC_TEMPLATE = {
+  SH: p => `pancada(s) de ${p || 'chuva'}`,
+  FZ: p => `${p || 'precipitação'} congelante`,
+  MI: p => `${p || 'nevoeiro'} raso(a)`,
+  BC: p => `${p || 'nevoeiro'} em banco`,
+  PR: p => `${p || 'nevoeiro'} parcial`,
+  DR: p => `${p || 'poeira/neve'} baixo(a), arrastado(a) pelo vento`,
+  BL: p => `${p || 'poeira/neve'} soprado(a) em alta pelo vento`,
+};
 
-// interpreta um grupo de tempo presente do METAR (ex.: "+TSRA", "-RA", "BR", "VCTS") em texto
-// legível, já sinalizando se é trovoada ou fenômeno severo — usado pra elevar o nível de alerta
+// interpreta um grupo de tempo presente do METAR (ex.: "+TSRA", "-RA", "BR", "VCTS", "RERA") em
+// texto legível, já sinalizando se é trovoada ativa ou fenômeno severo — usado pra elevar o nível
+// de alerta. "RE" (recente) indica algo que já cessou, então não conta como condição atual.
 function parseWxToken(tok){
-  const m = tok.match(/^(-|\+|VC)?(MI|BC|PR|DR|BL|SH|TS|FZ)?((?:DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS){0,4})$/);
+  const m = tok.match(/^(-|\+|VC|RE)?(MI|BC|PR|DR|BL|SH|TS|FZ)?((?:DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS){0,4})$/);
   if(!m) return null;
   const [, intensity, descriptor, phenBlock] = m;
   const phenCodes = phenBlock.match(/.{2}/g) || [];
   const phenLabels = phenCodes.map(c => WX_PHEN_LABEL[c]).filter(Boolean);
   if(phenLabels.length === 0 && !descriptor) return null;
 
-  const isThunderstorm = descriptor === 'TS';
-  const isSevere = isThunderstorm
+  const isRecent = intensity === 'RE';
+  const isThunderstorm = descriptor === 'TS' && !isRecent;
+  const isSevere = !isRecent && (
+    isThunderstorm
     || phenCodes.some(c => SEVERE_WX_CODES.includes(c))
-    || (intensity === '+' && phenCodes.some(c => ['RA','SN'].includes(c)));
-  const hasFog = phenCodes.includes('BR') || phenCodes.includes('FG');
+    || (intensity === '+' && phenCodes.some(c => ['RA','SN'].includes(c)))
+  );
+  const hasFog = !isRecent && (phenCodes.includes('BR') || phenCodes.includes('FG'));
 
+  const phen = phenLabels.join(' e ') || null;
   let label;
-  if(isThunderstorm){
-    const intLabel = intensity === '+' ? ' forte' : intensity === '-' ? ' fraca' : '';
-    label = `trovoada${intLabel}` + (phenLabels.length ? ` com ${phenLabels.join(' e ')}` : '');
+  if(descriptor === 'TS'){
+    const qualifier = intensity === '+' ? ' forte' : intensity === '-' ? ' fraca'
+      : intensity === 'VC' ? ' nas proximidades' : intensity === 'RE' ? ' recente (já cessada)' : '';
+    label = `trovoada${qualifier}` + (phen ? ` com ${phen}` : '');
   } else {
-    const parts = [];
-    if(intensity && WX_INTENSITY_LABEL[intensity]) parts.push(WX_INTENSITY_LABEL[intensity]);
-    if(descriptor && WX_DESC_LABEL[descriptor]) parts.push(WX_DESC_LABEL[descriptor]);
-    parts.push(...phenLabels);
-    label = parts.join(' ');
+    const base = (descriptor && WX_DESC_TEMPLATE[descriptor]) ? WX_DESC_TEMPLATE[descriptor](phen) : (phen || '');
+    const firstGender = phenCodes.length ? (WX_PHEN_GENDER[phenCodes[0]] || 'f') : 'f';
+    const suffix = intensity === '+' ? 'forte' : intensity === '-' ? (firstGender === 'm' ? 'fraco' : 'fraca')
+      : intensity === 'VC' ? 'nas proximidades' : intensity === 'RE' ? 'recente (já cessada)' : '';
+    label = suffix ? `${base} ${suffix}`.trim() : base;
   }
   return { label, isThunderstorm, isSevere, hasFog };
 }
@@ -824,7 +841,7 @@ function parseMetarFields(mens){
   let cloudsText = 'Céu limpo';
   let tempText = '—', dewText = '—', qnhText = '—';
   const wxPhrases = [];
-  let hasThunderstorm = false, hasSevereWx = false, hasFog = false, hasConvectiveCloud = false, windShearRwy = null;
+  let hasThunderstorm = false, hasSevereWx = false, hasFog = false, hasConvectiveCloud = false, hasObscuredSky = false, windShearRwy = null;
 
   for(let i = 0; i < tokens.length; i++){
     const tok = tokens[i];
@@ -838,6 +855,8 @@ function parseMetarFields(mens){
       windKt = parseInt(m[2], 10);
       gustKt = m[4] ? parseInt(m[4], 10) : 0;
       windSpeedText = gustKt ? `${windKt} kt, rajadas ${gustKt} kt` : `${windKt} kt`;
+    } else if((m = tok.match(/^(\d{3})V(\d{3})$/))){
+      windText += ` (variando entre ${m[1]}° e ${m[2]}°)`;
     } else if(tok === 'CAVOK'){
       visibilityKm = 10; visibilityText = '10 km (CAVOK)'; cloudsText = 'Céu limpo';
     } else if(/^\d{4}$/.test(tok) && tok !== '0000'){
@@ -851,6 +870,12 @@ function parseMetarFields(mens){
       const desc = `${CLOUD_NAMES[m[1]]} a ${parseInt(m[2],10)*100} ft${suffix}`;
       cloudsText = cloudsText === 'Céu limpo' ? desc : `${cloudsText} / ${desc}`;
       if(m[3] === 'CB') hasConvectiveCloud = true;
+    } else if((m = tok.match(/^VV(\d{3}|\/\/\/)$/))){
+      const vvDesc = m[1] === '///' ? 'não medida' : `${parseInt(m[1],10)*100} ft`;
+      const vvFt = m[1] === '///' ? null : parseInt(m[1],10)*100;
+      const desc = `Céu obscurecido, teto indefinido (visibilidade vertical ${vvDesc})`;
+      cloudsText = cloudsText === 'Céu limpo' ? desc : `${cloudsText} / ${desc}`;
+      if(vvFt === null || vvFt < 500) hasObscuredSky = true;
     } else if((m = tok.match(/^(M?\d{2})\/(M?\d{2})$/))){
       tempText = (m[1].startsWith('M') ? '-'+m[1].slice(1) : m[1]) + '°C';
       dewText = (m[2].startsWith('M') ? '-'+m[2].slice(1) : m[2]) + '°C';
@@ -869,14 +894,14 @@ function parseMetarFields(mens){
 
   if(wxPhrases.length) cloudsText += ` — ${wxPhrases.join(', ')}`;
 
-  let level = 'low', condition = 'Bom para voo';
+  let level = 'low', condition = 'Dentro do padrão operacional';
   const hasLowVis = visibilityKm < 5 || hasFog;
   const hasVeryLowVis = visibilityKm < 1.6;
   const hasStrongWind = windKt >= 20 || gustKt >= 30;
   const hasSevereWind = windKt >= 30 || gustKt >= 40;
   const hasWindShear = windShearRwy !== null;
 
-  if(hasThunderstorm || hasSevereWx || hasWindShear || hasVeryLowVis || hasSevereWind || hasConvectiveCloud){
+  if(hasThunderstorm || hasSevereWx || hasWindShear || hasVeryLowVis || hasSevereWind || hasConvectiveCloud || hasObscuredSky){
     level = 'high';
     const reasons = [];
     if(hasThunderstorm) reasons.push('trovoada');
@@ -884,14 +909,15 @@ function parseMetarFields(mens){
     if(hasWindShear) reasons.push('tesoura de vento (wind shear)');
     if(hasSevereWind) reasons.push('vento muito forte');
     if(hasVeryLowVis) reasons.push('visibilidade muito baixa');
+    if(hasObscuredSky) reasons.push('céu obscurecido / teto indefinido');
     if(hasSevereWx && !hasThunderstorm) reasons.push('fenômeno severo');
-    condition = `Atenção: ${reasons.join(', ')} — pode afetar pousos e decolagens`;
+    condition = reasons.join(', ').replace(/^./, c => c.toUpperCase());
   } else if(hasLowVis || hasStrongWind){
     level = 'med';
     const reasons = [];
     if(hasLowVis) reasons.push('baixa visibilidade');
     if(hasStrongWind) reasons.push('vento forte');
-    condition = `${reasons.join(' e ')} — possíveis atrasos`.replace(/^./, c => c.toUpperCase());
+    condition = reasons.join(' e ').replace(/^./, c => c.toUpperCase());
   }
 
   return {
@@ -942,75 +968,62 @@ function buildMetarPlainSummary(data, airport){
 
   const sentences = [];
 
-  const quando = data.source === 'historic' ? `registrado em ${data.updated}` : `atualizado ${data.updated}`;
-  sentences.push(`Este é o boletim meteorológico do aeroporto de ${airport.city} (${airport.code}), ${quando}.`);
+  const quando = data.source === 'historic' ? `Registrado em ${data.updated}` : `Atualizado ${data.updated}`;
+  sentences.push(`Boletim de ${airport.city} (${airport.code}). ${quando}.`);
 
   if(windKt == null){
-    sentences.push(`Não há leitura de vento disponível nesta mensagem.`);
-  } else if(windKt < 3){
-    sentences.push(`O vento está praticamente calmo, o que favorece pousos e decolagens tranquilos.`);
+    sentences.push(`Vento: sem leitura na mensagem.`);
+  } else if(windKt < 3 && !gustKt){
+    sentences.push(`Vento: calmo.`);
   } else {
-    const dirText = isVariable ? 'de direção variável' : (windDirName ? `vindo do ${windDirName}` : '');
-    let s = `O vento sopra ${dirText} a ${windKt} nós`;
+    const dirText = isVariable ? 'direção variável' : (windDirName ? `${windDirName} (${data.wind})` : data.wind);
+    sentences.push(`Vento: ${dirText}, ${windKt} kt.`);
     if(gustKt >= 40){
-      s += `, com rajadas muito fortes de até ${gustKt} nós — risco real de turbulência forte e dificuldade de controle no pouso e na decolagem.`;
+      sentences.push(`Rajadas: até ${gustKt} kt — classificação muito forte.`);
     } else if(gustKt >= 30){
-      s += `, com rajadas fortes de até ${gustKt} nós — pode causar turbulência perceptível e exige atenção redobrada na aproximação.`;
+      sentences.push(`Rajadas: até ${gustKt} kt — classificação forte.`);
     } else if(gustKt >= 20){
-      s += `, com rajadas moderadas de até ${gustKt} nós — pode causar solavancos durante a aproximação.`;
+      sentences.push(`Rajadas: até ${gustKt} kt — classificação moderada.`);
     } else if(gustKt){
-      s += `, com rajadas leves de até ${gustKt} nós.`;
+      sentences.push(`Rajadas: até ${gustKt} kt — classificação leve.`);
     } else if(windKt >= 30){
-      s += `, uma intensidade muito forte, que pode dificultar pousos e decolagens.`;
+      sentences.push(`Classificação: vento muito forte.`);
     } else if(windKt >= 20){
-      s += `, uma intensidade considerada forte, o que pode exigir mais atenção do piloto no pouso.`;
-    } else {
-      s += `, uma intensidade moderada e sem grande impacto para o voo.`;
+      sentences.push(`Classificação: vento forte.`);
     }
-    sentences.push(s);
   }
 
   if(data.windShear){
     const rwy = data.windShear === 'ALL' ? 'em todas as pistas'
       : /^R\d/.test(data.windShear) ? `na pista ${data.windShear.slice(1)}`
-      : 'perto do aeródromo';
-    sentences.push(`A torre emitiu alerta de tesoura de vento (wind shear) ${rwy} — mudanças bruscas de vento podem ocorrer durante o pouso ou a decolagem.`);
+      : 'nas proximidades do aeródromo';
+    sentences.push(`ALERTA — Tesoura de vento (wind shear) reportada pela torre, ${rwy}.`);
   }
 
   if(visKm != null){
-    if(visKm >= 8){
-      sentences.push(`A visibilidade está boa, em torno de ${visKm} km, sem restrições para os voos.`);
-    } else if(visKm >= 5){
-      sentences.push(`A visibilidade está em ${visKm} km, um pouco reduzida mas ainda dentro do esperado.`);
-    } else {
-      sentences.push(`A visibilidade está baixa, de apenas ${visKm} km${hasFogMention ? ', por causa de neblina' : ''} — isso pode causar atrasos em pousos.`);
+    let tier;
+    if(visKm >= 8) tier = 'dentro do padrão';
+    else if(visKm >= 5) tier = 'reduzida';
+    else if(visKm >= 1.6) tier = 'baixa';
+    else tier = 'muito baixa';
+    sentences.push(`Visibilidade: ${visKm} km — ${tier}${hasFogMention ? ' (neblina/nevoeiro presente)' : ''}.`);
+  }
+
+  sentences.push(`Nuvens: ${data.clouds}.`);
+
+  if(tempNum != null && dewNum != null){
+    sentences.push(`Temperatura: ${data.temp}. Ponto de orvalho: ${data.dew}.`);
+    if(spread != null && spread <= 3){
+      sentences.push(`Diferença de ${spread}°C entre temperatura e orvalho — indica risco de formação de neblina.`);
     }
   }
 
-  if(/céu limpo/i.test(data.clouds)){
-    sentences.push(`O céu está limpo, sem nuvens significativas.`);
-  } else {
-    sentences.push(`A cobertura de nuvens registrada é: ${data.clouds.toLowerCase()}.`);
-  }
-
-  if(tempNum != null && dewNum != null){
-    let s = `A temperatura está em ${data.temp}, com ponto de orvalho em ${data.dew}`;
-    s += (spread != null && spread <= 3)
-      ? ` — como os dois valores estão próximos, há chance de neblina se formar.`
-      : `.`;
-    sentences.push(s);
-  }
-
   if(data.qnh && data.qnh !== '—'){
-    sentences.push(`A pressão atmosférica (QNH) está em ${data.qnh}, valor que os pilotos usam para calibrar o altímetro da aeronave.`);
+    sentences.push(`QNH: ${data.qnh}.`);
   }
 
-  const closing = {
-    low: 'No geral, as condições estão boas para voar.',
-    med: 'No geral, vale ficar atento a possíveis pequenos atrasos por causa dessas condições.',
-    high: 'No geral, essas condições podem afetar significativamente a operação do aeroporto.',
-  };
-  sentences.push(closing[data.level] || '');
+  const STATUS_WORD = { low: 'NORMAL', med: 'ATENÇÃO', high: 'CRÍTICO' };
+  sentences.push(`STATUS OPERACIONAL: ${STATUS_WORD[data.level] || '—'} — ${data.condition}.`);
 
   return sentences.filter(Boolean).join(' ');
 }
