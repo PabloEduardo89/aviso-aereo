@@ -736,21 +736,78 @@ function timeAgo(dateStr){
   return `há ${Math.round(diffMin/60)}h`;
 }
 
-// data de hoje em UTC (mesmo fuso usado pelas mensagens METAR e pelo campo "max" do date picker)
-function todayUTCDateStr(){
-  const d = new Date();
+// Brasília não observa mais horário de verão (desde 2019): deslocamento fixo de -3h sobre UTC.
+// A REDEMET só aceita consultas em UTC, mas o usuário escolhe data/hora pensando em Brasília —
+// todo o "de-para" entre os dois fusos fica concentrado nas funções abaixo.
+const BRT_OFFSET_HOURS = 3;
+
+// data de hoje no horário de Brasília (o que aparece no seletor de data/hora ao usuário)
+function todayLocalDateStr(){
+  const d = new Date(Date.now() - BRT_OFFSET_HOURS*3600*1000);
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth()+1)}-${pad(d.getUTCDate())}`;
 }
 
-// "2026-07-27 14:00:00" -> "27/07/2026 14:00 UTC"
+// converte um dia local (Brasília, 00h-23h) na janela UTC equivalente para consultar a REDEMET
+function localDateToUtcRange(date){
+  const [y, m, d] = date.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m-1, d, BRT_OFFSET_HOURS, 0, 0));
+  const end = new Date(Date.UTC(y, m-1, d, 23 + BRT_OFFSET_HOURS, 0, 0));
+  const fmt = dt => `${dt.getUTCFullYear()}${pad(dt.getUTCMonth()+1)}${pad(dt.getUTCDate())}${pad(dt.getUTCHours())}`;
+  return { dataIni: fmt(start), dataFim: fmt(end) };
+}
+
+// converte data local + hora local escolhidas pelo usuário no YYYYMMDDHH em UTC exigido pela REDEMET
+function localToUtcDateHour(date, localHour){
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d, localHour + BRT_OFFSET_HOURS, 0, 0));
+  return `${dt.getUTCFullYear()}${pad(dt.getUTCMonth()+1)}${pad(dt.getUTCDate())}${pad(dt.getUTCHours())}`;
+}
+
+// "2026-07-27 14:00:00" (UTC) -> "27/07/2026 14:00 UTC (11:00 em Brasília)"
 function formatUTCLabel(dateStr){
   const [datePart, timePart] = dateStr.split(' ');
   const [y, m, d] = datePart.split('-');
-  return `${d}/${m}/${y} ${(timePart||'00:00:00').slice(0,5)} UTC`;
+  const hhmm = (timePart||'00:00:00').slice(0,5);
+  const [hh, mm] = hhmm.split(':');
+  const localHour = (parseInt(hh,10) + 24 - BRT_OFFSET_HOURS) % 24;
+  return `${d}/${m}/${y} ${hhmm} UTC (${pad(localHour)}:${mm} em Brasília)`;
 }
 
 const CLOUD_NAMES = { FEW:'Poucas nuvens', SCT:'Nuvens esparsas', BKN:'Nublado', OVC:'Encoberto' };
-const WX_MAP = { BR:'neblina', FG:'nevoeiro', RA:'chuva', TS:'trovoada', DZ:'garoa', SN:'neve', HZ:'neblina seca', FU:'fumaça' };
+const WX_INTENSITY_LABEL = { '-':'fraco(a)', '+':'forte' };
+const WX_DESC_LABEL = { MI:'raso(a)', BC:'em banco', PR:'parcial', DR:'baixo, arrastado pelo vento', BL:'soprado(a) em alta pelo vento', SH:'em pancada(s) de', TS:'trovoada', FZ:'congelante' };
+const WX_PHEN_LABEL = { DZ:'garoa', RA:'chuva', SN:'neve', SG:'grãos de neve', IC:'cristais de gelo', PL:'grânulos de gelo', GR:'granizo', GS:'granizo pequeno', UP:'precipitação não identificada', BR:'neblina', FG:'nevoeiro', FU:'fumaça', VA:'cinza vulcânica', DU:'poeira', SA:'areia', HZ:'neblina seca', PY:'borrifo', PO:'redemoinho de poeira/areia', SQ:'rajada forte (squall)', FC:'tromba d\'água/tornado', SS:'tempestade de areia', DS:'tempestade de poeira' };
+const SEVERE_WX_CODES = ['GR','FC','SS','DS','SQ'];
+
+// interpreta um grupo de tempo presente do METAR (ex.: "+TSRA", "-RA", "BR", "VCTS") em texto
+// legível, já sinalizando se é trovoada ou fenômeno severo — usado pra elevar o nível de alerta
+function parseWxToken(tok){
+  const m = tok.match(/^(-|\+|VC)?(MI|BC|PR|DR|BL|SH|TS|FZ)?((?:DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS){0,4})$/);
+  if(!m) return null;
+  const [, intensity, descriptor, phenBlock] = m;
+  const phenCodes = phenBlock.match(/.{2}/g) || [];
+  const phenLabels = phenCodes.map(c => WX_PHEN_LABEL[c]).filter(Boolean);
+  if(phenLabels.length === 0 && !descriptor) return null;
+
+  const isThunderstorm = descriptor === 'TS';
+  const isSevere = isThunderstorm
+    || phenCodes.some(c => SEVERE_WX_CODES.includes(c))
+    || (intensity === '+' && phenCodes.some(c => ['RA','SN'].includes(c)));
+  const hasFog = phenCodes.includes('BR') || phenCodes.includes('FG');
+
+  let label;
+  if(isThunderstorm){
+    const intLabel = intensity === '+' ? ' forte' : intensity === '-' ? ' fraca' : '';
+    label = `trovoada${intLabel}` + (phenLabels.length ? ` com ${phenLabels.join(' e ')}` : '');
+  } else {
+    const parts = [];
+    if(intensity && WX_INTENSITY_LABEL[intensity]) parts.push(WX_INTENSITY_LABEL[intensity]);
+    if(descriptor && WX_DESC_LABEL[descriptor]) parts.push(WX_DESC_LABEL[descriptor]);
+    parts.push(...phenLabels);
+    label = parts.join(' ');
+  }
+  return { label, isThunderstorm, isSevere, hasFog };
+}
 
 function parseMetarRaw(mens, recebimento){
   return { ...parseMetarFields(mens), updated: timeAgo(recebimento) };
@@ -767,9 +824,15 @@ function parseMetarFields(mens){
   let cloudsText = 'Céu limpo';
   let tempText = '—', dewText = '—', qnhText = '—';
   const wxPhrases = [];
+  let hasThunderstorm = false, hasSevereWx = false, hasFog = false, hasConvectiveCloud = false, windShearRwy = null;
 
-  tokens.forEach(tok => {
+  for(let i = 0; i < tokens.length; i++){
+    const tok = tokens[i];
     let m;
+    if(tok === 'WS'){
+      windShearRwy = tokens[i+1] || 'não especificado';
+      continue;
+    }
     if((m = tok.match(/^(\d{3}|VRB)(\d{2,3})(G(\d{2,3}))?KT$/))){
       windText = m[1] === 'VRB' ? 'Variável' : `${m[1]}°`;
       windKt = parseInt(m[2], 10);
@@ -783,26 +846,53 @@ function parseMetarFields(mens){
       visibilityText = meters >= 9999 ? '10 km' : `${(meters/1000).toFixed(1)} km`;
     } else if(['SKC','NSC','CLR'].includes(tok)){
       cloudsText = 'Céu limpo';
-    } else if((m = tok.match(/^(FEW|SCT|BKN|OVC)(\d{3})$/))){
-      const desc = `${CLOUD_NAMES[m[1]]} a ${parseInt(m[2],10)*100} ft`;
+    } else if((m = tok.match(/^(FEW|SCT|BKN|OVC)(\d{3})(CB|TCU)?$/))){
+      const suffix = m[3] === 'CB' ? ' (cumulonimbus — nuvem de tempestade)' : m[3] === 'TCU' ? ' (torre de cumulus, indício de instabilidade)' : '';
+      const desc = `${CLOUD_NAMES[m[1]]} a ${parseInt(m[2],10)*100} ft${suffix}`;
       cloudsText = cloudsText === 'Céu limpo' ? desc : `${cloudsText} / ${desc}`;
-    } else if(WX_MAP[tok]){
-      wxPhrases.push(WX_MAP[tok]);
+      if(m[3] === 'CB') hasConvectiveCloud = true;
     } else if((m = tok.match(/^(M?\d{2})\/(M?\d{2})$/))){
       tempText = (m[1].startsWith('M') ? '-'+m[1].slice(1) : m[1]) + '°C';
       dewText = (m[2].startsWith('M') ? '-'+m[2].slice(1) : m[2]) + '°C';
     } else if((m = tok.match(/^Q(\d{4})$/))){
       qnhText = `${parseInt(m[1],10)} hPa`;
+    } else {
+      const wx = parseWxToken(tok);
+      if(wx){
+        wxPhrases.push(wx.label);
+        if(wx.isThunderstorm) hasThunderstorm = true;
+        if(wx.isSevere) hasSevereWx = true;
+        if(wx.hasFog) hasFog = true;
+      }
     }
-  });
+  }
 
   if(wxPhrases.length) cloudsText += ` — ${wxPhrases.join(', ')}`;
 
   let level = 'low', condition = 'Bom para voo';
-  const hasLowVis = visibilityKm < 5 || wxPhrases.some(w => ['neblina','nevoeiro'].includes(w));
+  const hasLowVis = visibilityKm < 5 || hasFog;
+  const hasVeryLowVis = visibilityKm < 1.6;
   const hasStrongWind = windKt >= 20 || gustKt >= 30;
-  if(hasLowVis){ level = 'med'; condition = 'Baixa visibilidade — possíveis atrasos'; }
-  else if(hasStrongWind){ level = 'med'; condition = 'Vento forte — possíveis atrasos'; }
+  const hasSevereWind = windKt >= 30 || gustKt >= 40;
+  const hasWindShear = windShearRwy !== null;
+
+  if(hasThunderstorm || hasSevereWx || hasWindShear || hasVeryLowVis || hasSevereWind || hasConvectiveCloud){
+    level = 'high';
+    const reasons = [];
+    if(hasThunderstorm) reasons.push('trovoada');
+    if(hasConvectiveCloud && !hasThunderstorm) reasons.push('nuvem de tempestade (cumulonimbus)');
+    if(hasWindShear) reasons.push('tesoura de vento (wind shear)');
+    if(hasSevereWind) reasons.push('vento muito forte');
+    if(hasVeryLowVis) reasons.push('visibilidade muito baixa');
+    if(hasSevereWx && !hasThunderstorm) reasons.push('fenômeno severo');
+    condition = `Atenção: ${reasons.join(', ')} — pode afetar pousos e decolagens`;
+  } else if(hasLowVis || hasStrongWind){
+    level = 'med';
+    const reasons = [];
+    if(hasLowVis) reasons.push('baixa visibilidade');
+    if(hasStrongWind) reasons.push('vento forte');
+    condition = `${reasons.join(' e ')} — possíveis atrasos`.replace(/^./, c => c.toUpperCase());
+  }
 
   return {
     wind: windText,
@@ -813,6 +903,7 @@ function parseMetarFields(mens){
     dew: dewText,
     qnh: qnhText,
     condition, level,
+    windShear: windShearRwy,
     raw: clean + '='
   };
 }
@@ -869,6 +960,13 @@ function buildMetarPlainSummary(data, airport){
       s += `, uma intensidade moderada e sem grande impacto para o voo.`;
     }
     sentences.push(s);
+  }
+
+  if(data.windShear){
+    const rwy = data.windShear === 'ALL' ? 'em todas as pistas'
+      : /^R\d/.test(data.windShear) ? `na pista ${data.windShear.slice(1)}`
+      : 'perto do aeródromo';
+    sentences.push(`A torre emitiu alerta de tesoura de vento (wind shear) ${rwy} — mudanças bruscas de vento podem ocorrer durante o pouso ou a decolagem.`);
   }
 
   if(visKm != null){
@@ -949,17 +1047,16 @@ async function loadHistoricMetar(icao, date){
   if(historicMetarLoading[key]) return;
   historicMetarLoading[key] = true;
   try{
-    const [y, m, d] = date.split('-');
-    const dataIni = `${y}${m}${d}00`;
-    const dataFim = `${y}${m}${d}23`;
+    const { dataIni, dataFim } = localDateToUtcRange(date);
     const url = `${REDEMET_BASE}/mensagens/metar/${icao}?data_ini=${dataIni}&data_fim=${dataFim}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
     const resp = await fetch(url);
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
     const list = (json && json.data && json.data.data) || [];
     if(list.length === 0) throw new Error('sem mensagens nesta data');
+    // "hour" já convertida para horário de Brasília, pra bater com o que o usuário escolheu
     const records = list.map(item => ({
-      hour: parseInt(item.recebimento.slice(11, 13), 10),
+      hour: (parseInt(item.recebimento.slice(11, 13), 10) + 24 - BRT_OFFSET_HOURS) % 24,
       recebimento: item.recebimento,
       parsed: { ...parseMetarFields(item.mens), updated: formatUTCLabel(item.recebimento) }
     }));
@@ -1036,8 +1133,7 @@ async function loadHistoricSatelite(date, hour){
   if(historicSateliteLoading[key]) return;
   historicSateliteLoading[key] = true;
   try{
-    const [y, m, d] = date.split('-');
-    const dataParam = `${y}${m}${d}${pad(hour)}`;
+    const dataParam = localToUtcDateHour(date, hour);
     const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=1&data=${dataParam}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
     const resp = await fetch(url);
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -1257,7 +1353,7 @@ function renderMetarSection(airport){
 
 function renderDateNav(){
   const wrap = document.getElementById('dateNav');
-  const today = todayUTCDateStr();
+  const today = todayLocalDateStr();
   wrap.innerHTML = `
     <div class="date-toggle">
       <div class="date-opt ${metarMode === 'live' ? 'active' : ''}" id="modeLive">Agora</div>
@@ -1266,6 +1362,7 @@ function renderDateNav(){
     ${metarMode === 'historic' ? `
       <div class="date-picker">
         <input type="date" id="historicDateInput" class="date-input" max="${today}" value="${historicDate || today}">
+        <div class="hour-hint">Data e horário em Brasília (UTC-3)</div>
         <div class="hour-scroll" id="hourScroll"></div>
       </div>
     ` : ''}
