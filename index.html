@@ -952,8 +952,16 @@ function buildMetarPlainSummary(data, airport){
   } else {
     const dirText = isVariable ? 'de direção variável' : (windDirName ? `vindo do ${windDirName}` : '');
     let s = `O vento sopra ${dirText} a ${windKt} nós`;
-    if(gustKt){
-      s += `, com rajadas de até ${gustKt} nós — pode causar leves solavancos durante a aproximação.`;
+    if(gustKt >= 40){
+      s += `, com rajadas muito fortes de até ${gustKt} nós — risco real de turbulência forte e dificuldade de controle no pouso e na decolagem.`;
+    } else if(gustKt >= 30){
+      s += `, com rajadas fortes de até ${gustKt} nós — pode causar turbulência perceptível e exige atenção redobrada na aproximação.`;
+    } else if(gustKt >= 20){
+      s += `, com rajadas moderadas de até ${gustKt} nós — pode causar solavancos durante a aproximação.`;
+    } else if(gustKt){
+      s += `, com rajadas leves de até ${gustKt} nós.`;
+    } else if(windKt >= 30){
+      s += `, uma intensidade muito forte, que pode dificultar pousos e decolagens.`;
     } else if(windKt >= 20){
       s += `, uma intensidade considerada forte, o que pode exigir mais atenção do piloto no pouso.`;
     } else {
@@ -1054,12 +1062,24 @@ async function loadHistoricMetar(icao, date){
     const json = await resp.json();
     const list = (json && json.data && json.data.data) || [];
     if(list.length === 0) throw new Error('sem mensagens nesta data');
-    // "hour" já convertida para horário de Brasília, pra bater com o que o usuário escolheu
-    const records = list.map(item => ({
-      hour: (parseInt(item.recebimento.slice(11, 13), 10) + 24 - BRT_OFFSET_HOURS) % 24,
-      recebimento: item.recebimento,
-      parsed: { ...parseMetarFields(item.mens), updated: formatUTCLabel(item.recebimento) }
-    }));
+    // "hour" já convertida para horário de Brasília, pra bater com o que o usuário escolheu.
+    // Pode haver mais de um boletim na mesma hora local (ex.: um SPECI emitido entre dois METAR
+    // de rotina, justamente pra avisar de uma piora repentina) — nesse caso fica o MAIS SEVERO,
+    // nunca simplesmente o primeiro, senão um alerta real (tesoura de vento, trovoada etc.)
+    // pode ser descartado só porque um boletim mais ameno da mesma hora chegou antes dele.
+    const LEVEL_RANK = { high: 2, med: 1, low: 0 };
+    const byHour = new Map();
+    list.forEach(item => {
+      const hour = (parseInt(item.recebimento.slice(11, 13), 10) + 24 - BRT_OFFSET_HOURS) % 24;
+      const parsed = { ...parseMetarFields(item.mens), updated: formatUTCLabel(item.recebimento) };
+      const existing = byHour.get(hour);
+      const isMoreSevere = !existing || LEVEL_RANK[parsed.level] > LEVEL_RANK[existing.parsed.level];
+      const isSameSeverityButNewer = existing && LEVEL_RANK[parsed.level] === LEVEL_RANK[existing.parsed.level] && item.recebimento > existing.recebimento;
+      if(isMoreSevere || isSameSeverityButNewer){
+        byHour.set(hour, { hour, recebimento: item.recebimento, parsed });
+      }
+    });
+    const records = [...byHour.values()].sort((a, b) => a.recebimento.localeCompare(b.recebimento));
     HISTORIC_METAR[key] = records;
     // ao terminar de carregar, seleciona automaticamente o horário mais recente do dia
     if(historicDate === date && historicHour === null){
