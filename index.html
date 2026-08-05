@@ -534,7 +534,7 @@
   .source-tag.fallback .dot{ background: var(--amber); }
   .source-tag.fallback{ color: var(--amber); }
 
-  /* ---- Mapa ao Vivo (OpenSky) ---- */
+  /* ---- Mapa ao Vivo (airplanes.live) ---- */
   .map-wrap{
     position: relative;
     height: min(70vh, 560px);
@@ -660,7 +660,7 @@
 <main id="main"></main>
 
 <div class="footnote">
-  Protótipo · NOTAM/ROTAER com dados de exemplo · METAR e imagem de satélite conectados à API-REDEMET (DECEA) · Mapa ao Vivo conectado ao OpenSky Network
+  Protótipo · NOTAM/ROTAER com dados de exemplo · METAR e imagem de satélite conectados à API-REDEMET (DECEA) · Mapa ao Vivo conectado ao airplanes.live
 </div>
 
 <script>
@@ -1307,7 +1307,7 @@ function sourceTagHtml(source){
    MAPA AO VIVO — funções (estado declarado mais abaixo,
    junto do resto do estado da aplicação)
    ========================================================= */
-const MAP_POLL_MS = 13000; // ~13s — dentro da recomendação do OpenSky de não consultar mais rápido que isso
+const MAP_POLL_MS = 13000; // ~13s — folgado em relação ao limite do airplanes.live (1 req/s)
 
 function initMap(){
   mapInstance = L.map('liveMap', {
@@ -1322,11 +1322,11 @@ function initMap(){
 
   mapInstance.on('moveend zoomend', () => {
     clearTimeout(mapMoveDebounce);
-    mapMoveDebounce = setTimeout(fetchStatesInView, 1000);
+    mapMoveDebounce = setTimeout(fetchAircraftInView, 1000);
   });
 
   document.addEventListener('visibilitychange', handleMapVisibilityChange);
-  fetchStatesInView();
+  fetchAircraftInView();
   startMapPolling();
 }
 
@@ -1344,7 +1344,7 @@ function startMapPolling(){
   stopMapPolling();
   mapPollTimer = setInterval(() => {
     if(mapAutoRefresh && currentTab === 'mapa' && document.visibilityState === 'visible'){
-      fetchStatesInView();
+      fetchAircraftInView();
     }
   }, MAP_POLL_MS);
 }
@@ -1353,35 +1353,47 @@ function stopMapPolling(){
 }
 function handleMapVisibilityChange(){
   if(document.visibilityState === 'visible' && currentTab === 'mapa' && mapAutoRefresh){
-    fetchStatesInView();
+    fetchAircraftInView();
   }
 }
 
-async function fetchStatesInView(){
+const AIRPLANES_LIVE_MAX_RADIUS_NM = 250; // limite do endpoint /point da API
+
+// a API do airplanes.live busca por ponto + raio (não por bbox como o OpenSky).
+// Usamos o centro do mapa e a distância até o canto mais afastado como raio,
+// limitado a 250nm — em zooms bem afastados (ex.: Brasil inteiro visível) o
+// círculo cobre só a região central, não o mapa inteiro; é a troca aceita ao
+// migrar de bbox pra ponto+raio.
+function currentViewAsPointRadius(){
+  const center = mapInstance.getCenter();
+  const bounds = mapInstance.getBounds();
+  const corner = bounds.getNorthEast();
+  const radiusMeters = center.distanceTo(corner);
+  const radiusNm = Math.min(AIRPLANES_LIVE_MAX_RADIUS_NM, radiusMeters / 1852);
+  return { lat: center.lat, lon: center.lng, radiusNm };
+}
+
+async function fetchAircraftInView(){
   if(!mapInstance) return;
-  const b = mapInstance.getBounds();
-  const params = new URLSearchParams({
-    lamin: b.getSouth().toFixed(2),
-    lomin: b.getWest().toFixed(2),
-    lamax: b.getNorth().toFixed(2),
-    lomax: b.getEast().toFixed(2),
-  });
+  const { lat, lon, radiusNm } = currentViewAsPointRadius();
   try{
-    const resp = await fetch(`${OPENSKY_PROXY_BASE}/api/states?${params}`);
+    const resp = await fetch(
+      `${AIRPLANES_LIVE_BASE}/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${radiusNm.toFixed(1)}`
+    );
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
-    updateAircraftMarkers(json.states || []);
+    updateAircraftMarkers(json.ac || []);
     mapLastUpdateAt = Date.now();
     mapHasError = false;
   }catch(err){
-    console.warn('Falha ao buscar tráfego aéreo do OpenSky', err);
+    console.warn('Falha ao buscar tráfego aéreo do airplanes.live', err);
     mapHasError = true;
   }finally{
     renderMapPanel();
   }
 }
 
-// ícone de avião simples, rotacionado pelo rumo (true_track); 0° = norte, sentido horário
+// ícone de avião simples, rotacionado pelo rumo (track); 0° = norte, sentido horário
 function aircraftIcon(heading){
   return L.divIcon({
     className: 'aircraft-icon',
@@ -1394,54 +1406,60 @@ function aircraftIcon(heading){
   });
 }
 
+// dados vêm de uma API pública externa — escapa antes de jogar em innerHTML
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
 // atualiza os marcadores por diff (posição/rumo dos existentes, remove os que
 // saíram da área, adiciona os novos) em vez de recriar tudo — evita "piscar"
-// o mapa a cada atualização. Formato de cada item: ver /states/all do OpenSky.
-function updateAircraftMarkers(states){
+// o mapa a cada atualização. Formato de cada item: ver /point/[lat]/[lon]/[radius]
+// do airplanes.live (campo "ac" da resposta).
+function updateAircraftMarkers(aircraft){
   const seen = new Set();
-  states.forEach(s => {
-    const icao24 = s[0];
-    const callsignRaw = s[1];
-    const originCountry = s[2];
-    const lon = s[5], lat = s[6];
-    const baroAlt = s[7];
-    const onGround = s[8];
-    const velocity = s[9];
-    const trueTrack = s[10];
-    const geoAlt = s[13];
-    if(lat == null || lon == null || !icao24) return;
-    seen.add(icao24);
+  aircraft.forEach(a => {
+    const hex = a.hex;
+    const lat = a.lat, lon = a.lon;
+    if(lat == null || lon == null || !hex) return;
+    seen.add(hex);
 
-    const callsign = (callsignRaw || '').trim() || icao24.toUpperCase();
-    const heading = trueTrack || 0;
-    const altFt = Math.round(((geoAlt ?? baroAlt) || 0) * 3.28084);
-    const speedKt = Math.round((velocity || 0) * 1.94384);
+    const callsign = (a.flight || '').trim() || hex.toUpperCase();
+    const heading = a.track || 0;
+    const onGround = a.alt_baro === 'ground';
+    const altRaw = a.alt_geom ?? a.alt_baro;
+    const altFt = typeof altRaw === 'number' ? Math.round(altRaw) : 0;
+    const speedKt = Math.round(a.gs || 0);
+    const registration = a.r || '—';
+    const type = a.desc || a.t || '—';
 
-    let marker = aircraftMarkers[icao24];
+    let marker = aircraftMarkers[hex];
     if(!marker){
       marker = L.marker([lat, lon], { icon: aircraftIcon(heading) }).addTo(mapInstance);
       marker.bindPopup('');
-      aircraftMarkers[icao24] = marker;
+      aircraftMarkers[hex] = marker;
     } else {
       marker.setLatLng([lat, lon]);
       marker.setIcon(aircraftIcon(heading));
     }
     marker.setPopupContent(`
       <div class="aircraft-popup">
-        <div class="t">${callsign}</div>
-        <div class="r"><span>Origem</span><b>${originCountry || '—'}</b></div>
+        <div class="t">${escapeHtml(callsign)}</div>
+        <div class="r"><span>Registro</span><b>${escapeHtml(registration)}</b></div>
+        <div class="r"><span>Tipo</span><b>${escapeHtml(type)}</b></div>
         <div class="r"><span>Altitude</span><b>${onGround ? 'solo' : altFt + ' ft'}</b></div>
         <div class="r"><span>Velocidade</span><b>${speedKt} kt</b></div>
         <div class="r"><span>Rumo</span><b>${Math.round(heading)}°</b></div>
-        <div class="r"><span>ICAO24</span><b>${icao24}</b></div>
+        <div class="r"><span>ICAO24</span><b>${escapeHtml(hex)}</b></div>
       </div>
     `);
   });
 
-  Object.keys(aircraftMarkers).forEach(icao24 => {
-    if(!seen.has(icao24)){
-      mapInstance.removeLayer(aircraftMarkers[icao24]);
-      delete aircraftMarkers[icao24];
+  Object.keys(aircraftMarkers).forEach(hex => {
+    if(!seen.has(hex)){
+      mapInstance.removeLayer(aircraftMarkers[hex]);
+      delete aircraftMarkers[hex];
     }
   });
 
@@ -1481,7 +1499,7 @@ function renderMapPanel(){
     mapAutoRefresh = !mapAutoRefresh;
     renderMapPanel();
   };
-  document.getElementById('mapRefreshBtn').onclick = () => fetchStatesInView();
+  document.getElementById('mapRefreshBtn').onclick = () => fetchAircraftInView();
 }
 
 function renderMapaTab(main){
@@ -1494,7 +1512,7 @@ function renderMapaTab(main){
         <div class="map-fab" id="mapFab" title="Camadas e controles">⚙</div>
         <div class="map-panel" id="mapPanel"></div>
       </div>
-      <div class="map-attrib">Tráfego aéreo — OpenSky Network · mapa © OpenStreetMap contributors © CARTO</div>
+      <div class="map-attrib">Tráfego aéreo — airplanes.live · mapa © OpenStreetMap contributors © CARTO</div>
     `;
     initMap();
     document.getElementById('mapFab').onclick = toggleMapPanel;
@@ -1515,12 +1533,12 @@ let historicDate = null;   // 'YYYY-MM-DD' (UTC)
 let historicHour = null;   // 0-23 (UTC), horário escolhido dentro do dia
 
 /* =========================================================
-   MAPA AO VIVO — tráfego aéreo em tempo real (OpenSky Network,
-   via proxy Vercel Functions — ver opensky-proxy/README.md)
+   MAPA AO VIVO — tráfego aéreo em tempo real (airplanes.live,
+   agregador comunitário de dados ADS-B/MLAT)
    ========================================================= */
-// URL do proxy publicado com `vercel --prod` (ver opensky-proxy/README.md).
-// Não é segredo — o segredo real fica só nas env vars do Vercel.
-const OPENSKY_PROXY_BASE = "https://opensky-proxy-sigma.vercel.app";
+// API pública, sem autenticação, CORS liberado (Access-Control-Allow-Origin: *)
+// — chamada direta do navegador, sem proxy. Ver https://airplanes.live/api-guide/
+const AIRPLANES_LIVE_BASE = "https://api.airplanes.live/v2";
 
 let mapInstance = null;
 let mapPanelOpen = false;
@@ -1530,7 +1548,7 @@ let mapMoveDebounce = null;
 let mapLastUpdateAt = null;
 let mapAircraftCount = 0;
 let mapHasError = false;
-const aircraftMarkers = {}; // icao24 -> L.marker
+const aircraftMarkers = {}; // hex (icao24) -> L.marker
 
 function levelLabel(l){
   return l === "high" ? "Atenção" : l === "med" ? "Aviso" : l === "info" ? "Info" : "Informativo";

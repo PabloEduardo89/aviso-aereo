@@ -1,10 +1,16 @@
 # opensky-proxy
 
-Proxy Vercel (Serverless Functions) para a API do OpenSky Network, usado pela
-aba "Mapa ao Vivo" do app Aviso Aéreo. Existe porque o app é um site estático
-no GitHub Pages, sem backend — e o `client_secret` do OpenSky **nunca pode**
-ir para o navegador (diferente da API key da REDEMET usada nas outras abas,
-que é uma chave de baixo privilégio feita pra uso em app cliente).
+Proxy Vercel (Serverless Functions) para a API do OpenSky Network. Existe
+porque o app é um site estático no GitHub Pages, sem backend — e o
+`client_secret` do OpenSky **nunca pode** ir para o navegador (diferente da
+API key da REDEMET usada nas outras abas, que é uma chave de baixo privilégio
+feita pra uso em app cliente).
+
+> **Atualização:** a aba "Mapa ao Vivo" migrou do OpenSky para o
+> [airplanes.live](https://airplanes.live/api-guide/), que não exige
+> autenticação e libera CORS para chamada direta do navegador — não usa mais
+> este proxy. O código abaixo fica no repo caso o OpenSky volte a ser
+> necessário no futuro, mas `/api/states` está sem uso atualmente.
 
 O navegador chama este proxy; o proxy guarda `client_id`/`client_secret`,
 troca por um `access_token` OAuth2 (cacheado em memória por ~25 min) e repassa
