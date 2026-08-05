@@ -562,14 +562,32 @@
   .map-wrap .leaflet-control-zoom a:hover{ background: var(--panel); color: var(--amber); }
 
   .aircraft-icon{
+    position:relative;
     color: var(--amber);
     filter: drop-shadow(0 0 3px rgba(0,0,0,0.6));
   }
-  .aircraft-popup .t{ font-weight:700; font-size:13px; margin-bottom:4px; }
+  .aircraft-icon.tracked{
+    color:#fff;
+    filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 3px rgba(0,0,0,0.6));
+  }
+  .fav-badge{
+    position:absolute; top:-3px; right:-6px;
+    font-size:9px; color:#FFD866;
+    text-shadow: 0 0 2px rgba(0,0,0,0.9);
+  }
+  .aircraft-popup .t{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    font-weight:700; font-size:13px; margin-bottom:4px;
+  }
   .aircraft-popup .r{ display:flex; justify-content:space-between; gap:14px; font-size:12px; color:var(--muted); padding:2px 0; }
   .aircraft-popup .r b{ color: var(--text); font-weight:600; }
   .leaflet-popup-content-wrapper{ background: var(--panel); color: var(--text); border-radius:10px; }
   .leaflet-popup-tip{ background: var(--panel); }
+  .fav-btn{
+    background:none; border:none; cursor:pointer;
+    font-size:15px; color: var(--line); line-height:1; padding:0;
+  }
+  .fav-btn.on{ color: #FFD866; }
 
   .map-fab{
     position:absolute; right:14px; bottom:14px; z-index:1000;
@@ -588,7 +606,7 @@
 
   .map-panel{
     position:absolute; right:14px; bottom:66px; z-index:1000;
-    width:230px;
+    width:260px;
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 14px;
@@ -603,6 +621,61 @@
     font-size: 12.5px;
   }
   .map-panel .row + .row{ border-top: 1px solid var(--line); }
+
+  .map-panel-tabs{
+    display:flex; gap:4px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 10px;
+  }
+  .map-panel-tab{
+    flex:1; text-align:center;
+    padding: 6px 4px;
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 650;
+    color: var(--muted);
+    cursor:pointer;
+    user-select:none;
+    transition: all .15s ease;
+  }
+  .map-panel-tab:hover{ color: var(--text); }
+  .map-panel-tab.active{ background: var(--amber); color:#151515; }
+
+  .map-search-input{
+    width:100%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-size: 12.5px;
+    outline:none;
+    box-sizing:border-box;
+  }
+  .map-search-input:focus{ border-color: var(--amber); }
+  .map-search-input::placeholder{ color: var(--muted); }
+  .map-search-feedback{ margin-top:8px; font-size:11.5px; color: var(--muted); }
+  .map-search-feedback.error{ color: var(--red); }
+  .map-untrack{
+    margin-left:6px; color: var(--amber); cursor:pointer; text-decoration:underline;
+  }
+
+  .map-fav-list{ display:flex; flex-direction:column; gap:2px; max-height:200px; overflow-y:auto; }
+  .map-fav-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:7px 4px; border-radius:8px; cursor:pointer; font-size:12px;
+  }
+  .map-fav-row:hover{ background: var(--panel-2); }
+  .map-fav-info{ display:flex; align-items:center; gap:6px; min-width:0; }
+  .map-fav-info span:last-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .map-fav-dot{ width:7px; height:7px; border-radius:50%; background: var(--line); flex-shrink:0; }
+  .map-fav-dot.on{ background: var(--green); }
+  .map-fav-remove{ color: var(--muted); cursor:pointer; padding:2px 6px; flex-shrink:0; }
+  .map-fav-remove:hover{ color: var(--red); }
+  .map-fav-empty{ font-size:12px; color: var(--muted); line-height:1.5; }
   .map-switch{
     width:36px; height:20px; border-radius:20px;
     background: var(--line);
@@ -1325,6 +1398,14 @@ function initMap(){
     mapMoveDebounce = setTimeout(fetchAircraftInView, 1000);
   });
 
+  // delegação: o botão ★ é recriado a cada popup, então ouvimos no container
+  // do mapa (que vive enquanto o mapInstance existir) em vez de por popup
+  mapInstance.getContainer().addEventListener('click', (e) => {
+    const btn = e.target.closest('.fav-btn');
+    if(!btn) return;
+    toggleFavorite(btn.dataset.hex, btn.dataset.callsign);
+  });
+
   document.addEventListener('visibilitychange', handleMapVisibilityChange);
   fetchAircraftInView();
   startMapPolling();
@@ -1336,6 +1417,10 @@ function teardownMap(){
   clearTimeout(mapMoveDebounce);
   if(mapInstance){ mapInstance.remove(); mapInstance = null; }
   Object.keys(aircraftMarkers).forEach(k => delete aircraftMarkers[k]);
+  Object.keys(aircraftTrails).forEach(k => delete aircraftTrails[k]);
+  trackedHex = null;
+  trailPolyline = null;
+  mapSearchStatus = 'idle';
   mapLastUpdateAt = null;
   mapHasError = false;
 }
@@ -1393,13 +1478,17 @@ async function fetchAircraftInView(){
   }
 }
 
-// ícone de avião simples, rotacionado pelo rumo (track); 0° = norte, sentido horário
-function aircraftIcon(heading){
+// ícone de avião simples, rotacionado pelo rumo (track); 0° = norte, sentido horário.
+// `tracked` (selecionada/rastreada) e `favorite` (seguida) mudam a aparência.
+function aircraftIcon(heading, { tracked = false, favorite = false } = {}){
+  const cls = ['aircraft-icon'];
+  if(tracked) cls.push('tracked');
+  const badge = favorite ? '<span class="fav-badge">★</span>' : '';
   return L.divIcon({
-    className: 'aircraft-icon',
+    className: cls.join(' '),
     html: `<svg width="22" height="22" viewBox="0 0 24 24" style="transform:rotate(${heading}deg)">
       <path fill="currentColor" d="M12 2 L19 20 L12 16 L5 20 Z"/>
-    </svg>`,
+    </svg>${badge}`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
     popupAnchor: [0, -11],
@@ -1413,47 +1502,67 @@ function escapeHtml(str){
   }[c]));
 }
 
+// cria ou atualiza o marcador de UMA aeronave (usado tanto pelo poll normal
+// quanto pela busca, que pode encontrar uma aeronave fora da área já em tela)
+function upsertAircraftMarker(a, now){
+  const hex = a.hex;
+  const lat = a.lat, lon = a.lon;
+  if(lat == null || lon == null || !hex) return null;
+
+  const callsign = (a.flight || '').trim() || hex.toUpperCase();
+  const heading = a.track || 0;
+  const onGround = a.alt_baro === 'ground';
+  const altRaw = a.alt_geom ?? a.alt_baro;
+  const altFt = typeof altRaw === 'number' ? Math.round(altRaw) : 0;
+  const speedKt = Math.round(a.gs || 0);
+  const registration = a.r || '—';
+  const type = a.desc || a.t || '—';
+
+  recordTrailPoint(hex, lat, lon, now ?? Date.now());
+
+  const iconState = { tracked: hex === trackedHex, favorite: mapFavorites.has(hex) };
+
+  let marker = aircraftMarkers[hex];
+  if(!marker){
+    marker = L.marker([lat, lon], { icon: aircraftIcon(heading, iconState) }).addTo(mapInstance);
+    marker.bindPopup('');
+    // clique de novo na mesma aeronave para de rastreá-la
+    marker.on('click', () => setTrackedAircraft(hex === trackedHex ? null : hex));
+    aircraftMarkers[hex] = marker;
+  } else {
+    marker.setLatLng([lat, lon]);
+    marker.setIcon(aircraftIcon(heading, iconState));
+  }
+  marker._heading = heading;
+  marker._callsign = callsign;
+  marker.setPopupContent(`
+    <div class="aircraft-popup">
+      <div class="t">
+        <span>${escapeHtml(callsign)}</span>
+        <button class="fav-btn ${mapFavorites.has(hex) ? 'on' : ''}" data-hex="${escapeHtml(hex)}" data-callsign="${escapeHtml(callsign)}" title="Seguir aeronave">★</button>
+      </div>
+      <div class="r"><span>Registro</span><b>${escapeHtml(registration)}</b></div>
+      <div class="r"><span>Tipo</span><b>${escapeHtml(type)}</b></div>
+      <div class="r"><span>Altitude</span><b>${onGround ? 'solo' : altFt + ' ft'}</b></div>
+      <div class="r"><span>Velocidade</span><b>${speedKt} kt</b></div>
+      <div class="r"><span>Rumo</span><b>${Math.round(heading)}°</b></div>
+      <div class="r"><span>ICAO24</span><b>${escapeHtml(hex)}</b></div>
+    </div>
+  `);
+  return marker;
+}
+
 // atualiza os marcadores por diff (posição/rumo dos existentes, remove os que
 // saíram da área, adiciona os novos) em vez de recriar tudo — evita "piscar"
 // o mapa a cada atualização. Formato de cada item: ver /point/[lat]/[lon]/[radius]
 // do airplanes.live (campo "ac" da resposta).
 function updateAircraftMarkers(aircraft){
   const seen = new Set();
+  const now = Date.now();
   aircraft.forEach(a => {
-    const hex = a.hex;
-    const lat = a.lat, lon = a.lon;
-    if(lat == null || lon == null || !hex) return;
-    seen.add(hex);
-
-    const callsign = (a.flight || '').trim() || hex.toUpperCase();
-    const heading = a.track || 0;
-    const onGround = a.alt_baro === 'ground';
-    const altRaw = a.alt_geom ?? a.alt_baro;
-    const altFt = typeof altRaw === 'number' ? Math.round(altRaw) : 0;
-    const speedKt = Math.round(a.gs || 0);
-    const registration = a.r || '—';
-    const type = a.desc || a.t || '—';
-
-    let marker = aircraftMarkers[hex];
-    if(!marker){
-      marker = L.marker([lat, lon], { icon: aircraftIcon(heading) }).addTo(mapInstance);
-      marker.bindPopup('');
-      aircraftMarkers[hex] = marker;
-    } else {
-      marker.setLatLng([lat, lon]);
-      marker.setIcon(aircraftIcon(heading));
-    }
-    marker.setPopupContent(`
-      <div class="aircraft-popup">
-        <div class="t">${escapeHtml(callsign)}</div>
-        <div class="r"><span>Registro</span><b>${escapeHtml(registration)}</b></div>
-        <div class="r"><span>Tipo</span><b>${escapeHtml(type)}</b></div>
-        <div class="r"><span>Altitude</span><b>${onGround ? 'solo' : altFt + ' ft'}</b></div>
-        <div class="r"><span>Velocidade</span><b>${speedKt} kt</b></div>
-        <div class="r"><span>Rumo</span><b>${Math.round(heading)}°</b></div>
-        <div class="r"><span>ICAO24</span><b>${escapeHtml(hex)}</b></div>
-      </div>
-    `);
+    if(a.lat == null || a.lon == null || !a.hex) return;
+    upsertAircraftMarker(a, now);
+    seen.add(a.hex);
   });
 
   Object.keys(aircraftMarkers).forEach(hex => {
@@ -1464,6 +1573,128 @@ function updateAircraftMarkers(aircraft){
   });
 
   mapAircraftCount = seen.size;
+  if(trackedHex) renderTrackedTrail();
+}
+
+/* ---- histórico de trajetória (client-side; airplanes.live não tem endpoint
+   de trace na API pública — testado em /hex, /callsign e /reg, só devolvem
+   a posição atual) ---- */
+const TRAIL_MAX_AGE_MS = 2 * 60 * 60 * 1000; // mantém só as últimas 2h de rastro
+const TRAIL_MAX_POINTS = 400; // trava de segurança independente do tempo
+
+function recordTrailPoint(hex, lat, lon, t){
+  let trail = aircraftTrails[hex];
+  if(!trail){ trail = []; aircraftTrails[hex] = trail; }
+  const last = trail[trail.length - 1];
+  if(last && last.lat === lat && last.lon === lon) return; // sem posição nova
+  trail.push({ lat, lon, t });
+  const cutoff = t - TRAIL_MAX_AGE_MS;
+  while(trail.length && trail[0].t < cutoff) trail.shift();
+  if(trail.length > TRAIL_MAX_POINTS) trail.splice(0, trail.length - TRAIL_MAX_POINTS);
+}
+
+function renderTrackedTrail(){
+  if(trailPolyline){ mapInstance.removeLayer(trailPolyline); trailPolyline = null; }
+  if(!trackedHex) return;
+  const trail = aircraftTrails[trackedHex];
+  if(!trail || trail.length < 2) return;
+  trailPolyline = L.polyline(trail.map(p => [p.lat, p.lon]), {
+    color: '#F2A93B', // var(--amber) — cor de tema hardcoded pq Leaflet seta como atributo SVG
+    weight: 2,
+    dashArray: '4 6',
+    opacity: 0.85,
+  }).addTo(mapInstance);
+}
+
+// define (ou limpa, se hex=null) a aeronave rastreada; redesenha o ícone dela
+// (e da anterior, pra tirar o destaque) e o rastro
+function setTrackedAircraft(hex){
+  const prevHex = trackedHex;
+  trackedHex = hex;
+  [prevHex, trackedHex].forEach(h => {
+    if(!h) return;
+    const marker = aircraftMarkers[h];
+    if(marker) marker.setIcon(aircraftIcon(marker._heading || 0, { tracked: h === trackedHex, favorite: mapFavorites.has(h) }));
+  });
+  renderTrackedTrail();
+  if(mapPanelOpen) renderMapPanel();
+}
+
+/* ---- busca de aeronave por callsign, registro ou ICAO24 (hex) ---- */
+async function fetchFirstAircraft(path){
+  const resp = await fetch(`${AIRPLANES_LIVE_BASE}${path}`);
+  if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const json = await resp.json();
+  return (json.ac && json.ac[0]) || null;
+}
+
+async function searchAircraft(query){
+  const q = query.trim();
+  if(!q || !mapInstance) return;
+  mapSearchStatus = 'loading';
+  renderMapPanel();
+  try{
+    const isHex = /^[0-9a-f]{6}$/i.test(q);
+    let ac = isHex
+      ? await fetchFirstAircraft(`/hex/${q.toLowerCase()}`)
+      : await fetchFirstAircraft(`/callsign/${encodeURIComponent(q.toUpperCase())}`);
+    if(!ac && !isHex) ac = await fetchFirstAircraft(`/reg/${encodeURIComponent(q.toUpperCase())}`);
+
+    if(!mapInstance) return; // aba fechada enquanto a busca estava em andamento
+    if(!ac || ac.lat == null || ac.lon == null){
+      mapSearchStatus = 'notfound';
+      renderMapPanel();
+      return;
+    }
+    upsertAircraftMarker(ac);
+    mapInstance.setView([ac.lat, ac.lon], Math.max(mapInstance.getZoom(), 8));
+    setTrackedAircraft(ac.hex);
+    const marker = aircraftMarkers[ac.hex];
+    if(marker) marker.openPopup();
+    mapSearchStatus = 'idle';
+  }catch(err){
+    console.warn('Falha ao buscar aeronave', err);
+    if(!mapInstance) return;
+    mapSearchStatus = 'error';
+  }
+  renderMapPanel();
+}
+
+/* ---- favoritos (persistidos no navegador, sem backend) ---- */
+const MAP_FAVORITES_KEY = 'avisoaereo:mapFavorites';
+
+function loadFavorites(){
+  try{
+    const raw = localStorage.getItem(MAP_FAVORITES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return new Map(Array.isArray(arr) ? arr : []);
+  }catch(err){
+    return new Map();
+  }
+}
+function saveFavorites(){
+  try{
+    localStorage.setItem(MAP_FAVORITES_KEY, JSON.stringify([...mapFavorites]));
+  }catch(err){
+    console.warn('Falha ao salvar favoritos', err);
+  }
+}
+function toggleFavorite(hex, callsign){
+  if(mapFavorites.has(hex)){
+    mapFavorites.delete(hex);
+  } else {
+    mapFavorites.set(hex, callsign || hex.toUpperCase());
+  }
+  saveFavorites();
+
+  const marker = aircraftMarkers[hex];
+  if(marker){
+    marker.setIcon(aircraftIcon(marker._heading || 0, { tracked: hex === trackedHex, favorite: mapFavorites.has(hex) }));
+    const popupEl = marker.getPopup() && marker.getPopup().getElement();
+    const btn = popupEl && popupEl.querySelector('.fav-btn');
+    if(btn) btn.classList.toggle('on', mapFavorites.has(hex));
+  }
+  if(mapPanelOpen && mapPanelTab === 'favoritos') renderMapPanel();
 }
 
 function mapStatusText(){
@@ -1483,23 +1714,103 @@ function toggleMapPanel(){
   renderMapPanel();
 }
 
+function mapSearchFeedback(){
+  if(mapSearchStatus === 'loading') return `<div class="map-search-feedback">Buscando...</div>`;
+  if(mapSearchStatus === 'notfound') return `<div class="map-search-feedback error">Aeronave não encontrada ou fora do ar no momento.</div>`;
+  if(mapSearchStatus === 'error') return `<div class="map-search-feedback error">Falha na busca. Tente de novo.</div>`;
+  return '';
+}
+
+function renderFavoritesList(){
+  if(mapFavorites.size === 0){
+    return `<div class="map-fav-empty">Nenhuma aeronave seguida ainda. Toque na estrela ★ no popup de uma aeronave pra segui-la.</div>`;
+  }
+  const rows = [...mapFavorites.entries()].map(([hex, callsign]) => {
+    const airborne = !!aircraftMarkers[hex];
+    return `
+      <div class="map-fav-row" data-hex="${escapeHtml(hex)}">
+        <div class="map-fav-info">
+          <span class="map-fav-dot ${airborne ? 'on' : ''}" title="${airborne ? 'No ar, na área visível' : 'Fora da área visível ou no solo'}"></span>
+          <span>${escapeHtml(callsign)}</span>
+        </div>
+        <span class="map-fav-remove" data-remove="${escapeHtml(hex)}" title="Remover dos favoritos">✕</span>
+      </div>
+    `;
+  }).join('');
+  return `<div class="map-fav-list">${rows}</div>`;
+}
+
 function renderMapPanel(){
   const panel = document.getElementById('mapPanel');
   if(!panel) return;
   panel.classList.toggle('open', mapPanelOpen);
-  panel.innerHTML = `
-    <div class="row">
-      <span>Atualização automática</span>
-      <div class="map-switch ${mapAutoRefresh ? 'on' : ''}" id="mapAutoSwitch"></div>
+
+  const tabsHtml = `
+    <div class="map-panel-tabs">
+      <div class="map-panel-tab ${mapPanelTab === 'controles' ? 'active' : ''}" data-tab="controles">Controles</div>
+      <div class="map-panel-tab ${mapPanelTab === 'busca' ? 'active' : ''}" data-tab="busca">Busca</div>
+      <div class="map-panel-tab ${mapPanelTab === 'favoritos' ? 'active' : ''}" data-tab="favoritos">Favoritos${mapFavorites.size ? ` (${mapFavorites.size})` : ''}</div>
     </div>
-    <div class="row status-line" style="justify-content:flex-start;">${mapStatusText()}</div>
-    <div class="btn-refresh" id="mapRefreshBtn">Atualizar agora</div>
   `;
-  document.getElementById('mapAutoSwitch').onclick = () => {
-    mapAutoRefresh = !mapAutoRefresh;
-    renderMapPanel();
-  };
-  document.getElementById('mapRefreshBtn').onclick = () => fetchAircraftInView();
+
+  let bodyHtml;
+  if(mapPanelTab === 'busca'){
+    bodyHtml = `
+      <input class="map-search-input" id="mapSearchInput" placeholder="Callsign, registro ou ICAO24..." value="${escapeHtml(mapSearchQuery)}" />
+      <div class="btn-refresh" id="mapSearchBtn">Buscar</div>
+      ${mapSearchFeedback()}
+    `;
+  } else if(mapPanelTab === 'favoritos'){
+    bodyHtml = renderFavoritesList();
+  } else {
+    bodyHtml = `
+      <div class="row">
+        <span>Atualização automática</span>
+        <div class="map-switch ${mapAutoRefresh ? 'on' : ''}" id="mapAutoSwitch"></div>
+      </div>
+      <div class="row status-line" style="justify-content:flex-start;">${mapStatusText()}</div>
+      <div class="btn-refresh" id="mapRefreshBtn">Atualizar agora</div>
+      ${trackedHex ? `<div class="row status-line" style="justify-content:flex-start;">Rastreando ${escapeHtml(aircraftMarkers[trackedHex] ? aircraftMarkers[trackedHex]._callsign : trackedHex.toUpperCase())} <span class="map-untrack" id="mapUntrackBtn">parar</span></div>` : ''}
+    `;
+  }
+
+  panel.innerHTML = tabsHtml + bodyHtml;
+
+  panel.querySelectorAll('.map-panel-tab').forEach(el => {
+    el.onclick = () => { mapPanelTab = el.dataset.tab; renderMapPanel(); };
+  });
+
+  if(mapPanelTab === 'busca'){
+    const input = document.getElementById('mapSearchInput');
+    input.oninput = (e) => { mapSearchQuery = e.target.value; };
+    input.onkeydown = (e) => { if(e.key === 'Enter') searchAircraft(mapSearchQuery); };
+    document.getElementById('mapSearchBtn').onclick = () => searchAircraft(mapSearchQuery);
+  } else if(mapPanelTab === 'favoritos'){
+    panel.querySelectorAll('.map-fav-row').forEach(row => {
+      row.onclick = () => {
+        const hex = row.dataset.hex;
+        const marker = aircraftMarkers[hex];
+        if(!marker) return; // não está na área visível no momento
+        mapInstance.setView(marker.getLatLng(), Math.max(mapInstance.getZoom(), 8));
+        setTrackedAircraft(hex);
+        marker.openPopup();
+      };
+    });
+    panel.querySelectorAll('.map-fav-remove').forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        toggleFavorite(btn.dataset.remove);
+      };
+    });
+  } else {
+    document.getElementById('mapAutoSwitch').onclick = () => {
+      mapAutoRefresh = !mapAutoRefresh;
+      renderMapPanel();
+    };
+    document.getElementById('mapRefreshBtn').onclick = () => fetchAircraftInView();
+    const untrackBtn = document.getElementById('mapUntrackBtn');
+    if(untrackBtn) untrackBtn.onclick = () => setTrackedAircraft(null);
+  }
 }
 
 function renderMapaTab(main){
@@ -1549,6 +1860,15 @@ let mapLastUpdateAt = null;
 let mapAircraftCount = 0;
 let mapHasError = false;
 const aircraftMarkers = {}; // hex (icao24) -> L.marker
+
+let trackedHex = null;        // hex da aeronave selecionada/rastreada no momento
+let trailPolyline = null;     // L.polyline com o rastro da aeronave rastreada
+const aircraftTrails = {};    // hex -> [{lat,lon,t}], histórico acumulado em memória
+
+let mapPanelTab = 'controles'; // 'controles' | 'busca' | 'favoritos'
+let mapSearchQuery = '';
+let mapSearchStatus = 'idle';  // 'idle' | 'loading' | 'notfound' | 'error'
+let mapFavorites = loadFavorites(); // hex -> callsign, persistido em localStorage
 
 function levelLabel(l){
   return l === "high" ? "Atenção" : l === "med" ? "Aviso" : l === "info" ? "Info" : "Informativo";
