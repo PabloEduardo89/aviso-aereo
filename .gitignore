@@ -1,0 +1,12 @@
+# Credenciais — nunca commitar
+credentials.json
+credentials*.json
+.env
+.env.*
+*.secret
+*.pem
+*.key
+
+# opensky-proxy (Vercel Functions)
+node_modules/
+.vercel/
