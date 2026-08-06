@@ -1334,10 +1334,18 @@ async function loadRealSatelite(){
     const resp = await fetch(url);
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
-    const list = (json && json.data && json.data.satelite) || [];
+    let list = (json && json.data && json.data.satelite) || [];
+    let stale = false;
+    if(list.length === 0){
+      // a REDEMET às vezes fica horas sem publicar imagem nova e, nesse caso, o feed
+      // "ao vivo" (sem parâmetro data) responde vazio mesmo com imagens antigas ainda
+      // existindo — em vez de desistir, procura a última imagem realmente publicada
+      const ultimaConhecida = await findLastAvailableSatelite();
+      if(ultimaConhecida){ list = [ultimaConhecida]; stale = true; }
+    }
     if(list.length === 0) throw new Error('sem imagens de satélite disponíveis no momento');
     const ultima = list[list.length - 1];
-    REAL_SATELITE = { path: ultima.path, updated: timeAgo(ultima.data) };
+    REAL_SATELITE = { path: ultima.path, updated: timeAgo(ultima.data), stale };
   }catch(err){
     console.warn('Falha ao buscar imagem de satélite da REDEMET', err);
     REAL_SATELITE = null; // marca como "tentou e falhou" -> cai no placeholder ilustrativo
@@ -1349,6 +1357,26 @@ async function loadRealSatelite(){
   }
 }
 
+// recua no tempo em saltos de 6h (o "cache recente" da REDEMET some quando o feed
+// ao vivo fica sem imagem nova por várias horas, mas o histórico de horas mais
+// antigas continua respondendo normalmente) até achar a última imagem publicada,
+// em vez de simplesmente mostrar "imagem indisponível" pro usuário
+async function findLastAvailableSatelite(){
+  for(let step = 1; step <= 8; step++){
+    try{
+      const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=3&data=${nowUTCString(-6*step)}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
+      const resp = await fetch(url);
+      if(!resp.ok) continue;
+      const json = await resp.json();
+      const list = (json && json.data && json.data.satelite) || [];
+      if(list.length > 0) return list[list.length - 1];
+    }catch(err){
+      // tenta o próximo salto de 6h no passado
+    }
+  }
+  return null;
+}
+
 function getSateliteData(){
   if(metarMode === 'historic'){
     if(!historicDate || historicHour === null) return { source: 'idle' };
@@ -1358,7 +1386,7 @@ function getSateliteData(){
     if(v === null) return { source: 'fallback-historic' };
     return { ...v, source: 'historic' };
   }
-  if(REAL_SATELITE) return { ...REAL_SATELITE, source: 'real' };
+  if(REAL_SATELITE) return { ...REAL_SATELITE, source: REAL_SATELITE.stale ? 'stale' : 'real' };
   if(REAL_SATELITE === null) return { source: 'fallback' };
   return { source: 'loading' };
 }
@@ -1396,6 +1424,7 @@ function sourceTagHtml(source, apiLabel){
   if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado da ${api}...</div>`;
   if(source === 'fallback') return `<div class="source-tag fallback"><span class="dot"></span>Dado de exemplo — ${api} indisponível no momento</div>`;
   if(source === 'fallback-historic') return `<div class="source-tag fallback"><span class="dot"></span>Imagem indisponível para esse horário</div>`;
+  if(source === 'stale') return `<div class="source-tag fallback"><span class="dot"></span>Última imagem disponível — API-${api} (desatualizada)</div>`;
   return '';
 }
 
@@ -2549,7 +2578,7 @@ function renderMetarImagem(metarData){
   const content = document.getElementById('metarSubContent');
   const sat = getSateliteData();
   const level = (metarData && metarData.level) ? metarData.level : 'low';
-  const hasImage = sat.source === 'real' || sat.source === 'historic';
+  const hasImage = sat.source === 'real' || sat.source === 'historic' || sat.source === 'stale';
 
   const frame = hasImage
     ? `<img src="${sat.path}" alt="Imagem de satélite REDEMET" style="width:100%; height:auto; display:block; border-radius:8px;">`
@@ -2558,6 +2587,7 @@ function renderMetarImagem(metarData){
   let caption;
   if(sat.source === 'real') caption = `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA · atualizada ${sat.updated}.`;
   else if(sat.source === 'historic') caption = `Imagem de satélite real (infravermelho realçado) de <b>${sat.updated}</b>, fornecida pela API-REDEMET/DECEA.`;
+  else if(sat.source === 'stale') caption = `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA — <b>desatualizada, ${sat.updated}</b> (a REDEMET ainda não publicou uma imagem mais recente).`;
   else if(sat.source === 'loading') caption = 'Carregando imagem de satélite da REDEMET...';
   else if(sat.source === 'idle') caption = 'Escolha uma data e um horário acima para ver a imagem de satélite daquele momento.';
   else if(sat.source === 'fallback-historic') caption = 'Ilustração de exemplo — não há imagem de satélite registrada para esse horário exato.';
