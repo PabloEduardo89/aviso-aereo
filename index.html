@@ -553,7 +553,7 @@
 <main id="main"></main>
 
 <div class="footnote">
-  Protótipo · NOTAM/ROTAER com dados de exemplo · METAR e imagem de satélite conectados à API-REDEMET (DECEA)
+  Protótipo · METAR e satélite via API-REDEMET · NOTAM e ROTAER via API-AISWEB (DECEA)
 </div>
 
 <script>
@@ -583,6 +583,26 @@ const HISTORIC_METAR = {};
 const historicMetarLoading = {};
 const HISTORIC_SATELLITE = {};
 const historicSateliteLoading = {};
+
+/* =========================================================
+   CONFIGURAÇÃO — API-AISWEB (DECEA) — NOTAM e ROTAER
+   ========================================================= */
+const AISWEB_API_KEY = "1567767989";
+const AISWEB_API_PASS = "7b96bad4-88ab-11f1-a4e0-0050569ac2e1";
+// o link enviado por e-mail (aisweb.aer.mil.br) está fora do ar; o domínio
+// realmente ativo, com CORS liberado (Access-Control-Allow-Origin: *), é este
+// abaixo — mesmo padrão de domínio .decea.mil.br usado pela REDEMET
+const AISWEB_BASE = "https://aisweb.decea.mil.br/api";
+
+// cache de dados reais buscados na API-AISWEB, por código ICAO
+// undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
+const REAL_NOTAM = {};
+const notamLoading = {};
+const REAL_ROTAER = {};
+const rotaerLoading = {};
+// link do PDF da Carta de Aeródromo (ADC) oficial — undefined = não tentou | null = falhou/não achou | string = URL
+const REAL_CARTA_ADC = {};
+const cartaAdcLoading = {};
 
 // aeroportos com ficha completa (NOTAM/METAR/ROTAER de exemplo) — também usados como chips de sugestão
 const FEATURED_CODES = ["SBFL", "SBGR", "SBRJ", "SBBR", "SBCF"];
@@ -620,7 +640,7 @@ const AIRPORTS = [
   { code: "SBSP", city: "Congonhas (São Paulo)", uf: "SP" },
   { code: "SBAR", city: "Aracaju", uf: "SE" },
   { code: "SBPJ", city: "Palmas", uf: "TO" },
-  { code: "SBKP", city: "Campinas", uf: "SP" },
+  { code: "SBKP", city: "Viracopos (Campinas)", uf: "SP" },
   { code: "SBFI", city: "Foz do Iguaçu", uf: "PR" },
   { code: "SBJV", city: "Joinville", uf: "SC" },
   { code: "SBNF", city: "Navegantes", uf: "SC" },
@@ -628,6 +648,8 @@ const AIRPORTS = [
   { code: "SBRD", city: "Rondonópolis", uf: "MT" },
   { code: "SBIZ", city: "Imperatriz", uf: "MA" },
   { code: "SBLO", city: "Londrina", uf: "PR" },
+  { code: "SBCA", city: "Cascavel", uf: "PR" },
+  { code: "SBMA", city: "Marabá", uf: "PA" },
 ];
 
 const TABS = [
@@ -703,15 +725,15 @@ const MOCK_METAR = {
 };
 
 const MOCK_ROTAER = {
-  SBFL: { nome:"Aeroporto Hercílio Luz", elevacao:"16 ft", pista:"14/32 — 2670 x 45 m, asfalto",
+  SBFL: { nome:"Aeroporto Hercílio Luz", elevacao:"16 ft", pista:"14/32 — 2670 x 45 m, asfalto", runwaysList:["14/32"],
     horario:"24 horas", freqTorre:"118.1 MHz", freqAproximacao:"119.05 MHz", combustivel:"JET A1 / AVGAS 100LL" },
-  SBGR: { nome:"Aeroporto Internacional de Guarulhos", elevacao:"750 ft", pista:"09L/27R e 09R/27L — 3000 m, asfalto",
+  SBGR: { nome:"Aeroporto Internacional de Guarulhos", elevacao:"750 ft", pista:"09L/27R e 09R/27L — 3000 m, asfalto", runwaysList:["09L/27R","09R/27L"],
     horario:"24 horas", freqTorre:"118.05 MHz", freqAproximacao:"119.75 MHz", combustivel:"JET A1" },
-  SBRJ: { nome:"Aeroporto Santos Dumont", elevacao:"11 ft", pista:"02L/20R — 1323 x 55 m, asfalto",
+  SBRJ: { nome:"Aeroporto Santos Dumont", elevacao:"11 ft", pista:"02L/20R — 1323 x 55 m, asfalto", runwaysList:["02L/20R"],
     horario:"6h às 23h", freqTorre:"118.3 MHz", freqAproximacao:"127.05 MHz", combustivel:"JET A1" },
-  SBBR: { nome:"Aeroporto Internacional de Brasília", elevacao:"3497 ft", pista:"11L/29R — 3300 m, asfalto",
+  SBBR: { nome:"Aeroporto Internacional de Brasília", elevacao:"3497 ft", pista:"11L/29R — 3300 m, asfalto", runwaysList:["11L/29R"],
     horario:"24 horas", freqTorre:"118.1 MHz", freqAproximacao:"125.7 MHz", combustivel:"JET A1 / AVGAS 100LL" },
-  SBCF: { nome:"Aeroporto Internacional de Confins", elevacao:"2717 ft", pista:"02/20 — 3000 m, asfalto",
+  SBCF: { nome:"Aeroporto Internacional de Confins", elevacao:"2717 ft", pista:"02/20 — 3000 m, asfalto", runwaysList:["02/20"],
     horario:"24 horas", freqTorre:"118.0 MHz", freqAproximacao:"125.5 MHz", combustivel:"JET A1" },
 };
 
@@ -1186,14 +1208,317 @@ async function loadHistoricSatelite(date, hour){
   }
 }
 
-function sourceTagHtml(source){
-  if(source === 'real') return `<div class="source-tag real"><span class="dot"></span>Dado real — API-REDEMET</div>`;
-  if(source === 'historic') return `<div class="source-tag real"><span class="dot"></span>Dado histórico — API-REDEMET</div>`;
-  if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado da REDEMET...</div>`;
-  if(source === 'fallback') return `<div class="source-tag fallback"><span class="dot"></span>Dado de exemplo — REDEMET indisponível no momento</div>`;
+function sourceTagHtml(source, apiLabel){
+  const api = apiLabel || 'REDEMET';
+  if(source === 'real') return `<div class="source-tag real"><span class="dot"></span>Dado real — API-${api}</div>`;
+  if(source === 'historic') return `<div class="source-tag real"><span class="dot"></span>Dado histórico — API-${api}</div>`;
+  if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado da ${api}...</div>`;
+  if(source === 'fallback') return `<div class="source-tag fallback"><span class="dot"></span>Dado de exemplo — ${api} indisponível no momento</div>`;
   if(source === 'fallback-historic') return `<div class="source-tag fallback"><span class="dot"></span>Imagem indisponível para esse horário</div>`;
   return '';
 }
+
+/* =========================================================
+   INTEGRAÇÃO REAL — API-AISWEB (NOTAM e ROTAER)
+   ========================================================= */
+
+// dicionário de abreviações mais comuns em NOTAM/ROTAER, pra montar um texto em
+// linguagem simples "na marra" (tradução palavra a palavra). Não é uma tradução
+// perfeita — NOTAM mistura abreviação ICAO em inglês com português por conta própria —
+// mas ajuda a entender o essencial; o texto original completo continua disponível
+// no "Texto original" pra quem quiser conferir a mensagem exata.
+const NOTAM_ABBR = {
+  RWY:'pista', TWY:'pista de táxi', APRON:'pátio', THR:'cabeceira',
+  CLSD:'fechada(o)', 'U/S':'fora de serviço', WEF:'a partir de', TIL:'até', UNTIL:'até',
+  DUE:'devido a', DEVIDO:'devido a', MAINT:'manutenção', OBST:'obstáculo', LGTD:'iluminado(a)',
+  NEG:'sem', HGT:'altura', ALT:'altitude', AMSL:'acima do nível médio do mar', OTP:'topo do obstáculo',
+  COORD:'coordenadas', FREQ:'frequência', MHZ:'MHz', CH:'canal', BTN:'entre', RDL:'radial',
+  ACFT:'aeronave', FLT:'voo', RPA:'aeronave remotamente pilotada (drone)', UA:'aeronave não tripulada (drone)',
+  OPS:'operações', LDG:'pouso', TKOF:'decolagem', PRB:'proibido(a)', GND:'solo', RTO:'rota',
+  'VOR/DME':'VOR/DME (auxílio à navegação)', APCH:'aproximação', DLY:'diariamente',
+  'MON-FRI':'segunda a sexta', SER:'serviço', WI:'dentro de',
+};
+
+function translateNotamText(raw){
+  if(!raw) return '';
+  return raw.split(/\s+/).map(word => {
+    const bare = word.replace(/[.,;]+$/, '');
+    const hit = NOTAM_ABBR[bare.toUpperCase()];
+    return hit ? hit : word;
+  }).join(' ');
+}
+
+const NOTAM_CAT_LABEL = { AGA:'Pista/Solo', CNS:'Comunicação/Navegação', NAV:'Navegação', OTR:'Outros', MET:'Meteorologia', ATM:'Espaço aéreo' };
+
+// classifica severidade olhando o código Q e palavras-chave no corpo do aviso —
+// mesmo princípio da classificação do METAR: regra objetiva em cima do que a
+// mensagem diz, nunca "achismo"
+function classifyNotamLevel(parsed){
+  const e = (parsed.e || '').toUpperCase();
+  if(/\bCLSD\b/.test(e) && /\bRWY\b/.test(e)) return 'high';
+  if(/\bU\/S\b/.test(e) && (parsed.cat === 'NAV' || parsed.cat === 'CNS')) return 'med';
+  if(/\bOBST\b/.test(e)) return 'med';
+  if(parsed.cat === 'ATM') return 'med';
+  return 'low';
+}
+
+// datas da AISWEB vêm como YYMMDDHHmm (10 dígitos, UTC)
+function parseNotamDateField(s){
+  if(!s || s.length < 10) return null;
+  return {
+    y: 2000 + parseInt(s.slice(0,2),10), mo: parseInt(s.slice(2,4),10), d: parseInt(s.slice(4,6),10),
+    h: parseInt(s.slice(6,8),10), mi: parseInt(s.slice(8,10),10)
+  };
+}
+function formatNotamValidity(bStr, cStr){
+  const b = parseNotamDateField(bStr), c = parseNotamDateField(cStr);
+  if(!b) return '—';
+  const fmt = p => `${pad(p.d)}/${pad(p.mo)} ${pad(p.h)}:${pad(p.mi)}`;
+  return c ? `${fmt(b)} – ${fmt(c)} UTC` : `a partir de ${fmt(b)} UTC`;
+}
+// mesma leitura de B)/C), mas como Date de verdade — usada pra calcular "há quantos dias"
+// no resumo em linguagem simples (só dá pra fazer essa conta com data real, por isso o
+// resumo do NOTAM não funciona pros dados de exemplo, que não tem B)/C) no formato AISWEB)
+function notamFieldToDate(s){
+  const p = parseNotamDateField(s);
+  return p ? new Date(Date.UTC(p.y, p.mo-1, p.d, p.h, p.mi)) : null;
+}
+function describeRelativeDate(date){
+  const days = Math.round((date.getTime() - Date.now()) / 86400000);
+  if(days === 0) return 'hoje';
+  if(days > 0) return days === 1 ? 'amanhã' : `em ${days} dias`;
+  return days === -1 ? 'ontem' : `há ${Math.abs(days)} dias`;
+}
+
+function xmlText(node, tag){
+  const el = node.querySelector(tag);
+  return el && el.textContent ? el.textContent.trim() : '';
+}
+// campos de topo (aeródromo) da resposta ROTAER de um único ICAO ficam soltos
+// direto sob <aisweb>, mas nomes como <name>/<type> se repetem dentro de <org> e
+// <service> — por isso restringe a busca a filho direto da raiz pra não pegar
+// o valor errado por engano
+function directChildText(doc, tag){
+  const el = doc.querySelector(`aisweb > ${tag}`);
+  return el && el.textContent ? el.textContent.trim() : '';
+}
+
+function parseNotamXmlItem(item){
+  const e = xmlText(item, 'e');
+  const cat = xmlText(item, 'cat');
+  const level = classifyNotamLevel({ e, cat });
+  const translated = translateNotamText(e);
+  const rwyMatch = e.match(/\bRWY\s*(\d{2}[LRC]?)\/(\d{2}[LRC]?)/i);
+  const affected = rwyMatch ? `rwy${rwyMatch[1]}` : /\bAPRON\b/i.test(e) ? 'apron' : /\bTWY\b/i.test(e) ? 'twy' : null;
+  return {
+    level,
+    title: translated.length > 90 ? translated.slice(0, 87) + '...' : translated,
+    plain: translated,
+    full: translated,
+    raw: `(${xmlText(item,'n')} ${xmlText(item,'tp')}\nA) ${xmlText(item,'loc')} B) ${xmlText(item,'b')} C) ${xmlText(item,'c')}\nE) ${e})`,
+    category: NOTAM_CAT_LABEL[cat] || cat || 'Geral',
+    validity: formatNotamValidity(xmlText(item,'b'), xmlText(item,'c')),
+    validFrom: notamFieldToDate(xmlText(item,'b')),
+    validUntil: notamFieldToDate(xmlText(item,'c')),
+    affected,
+    geoUrl: xmlText(item, 'geo_url') || null,
+  };
+}
+
+/* =========================================================
+   RESUMO EM LINGUAGEM SIMPLES DO NOTAM — igual ao do METAR,
+   montado localmente a partir dos campos já traduzidos/classificados
+   (categoria, nível de severidade, datas de vigência reais), sem
+   depender de nenhuma chamada externa
+   ========================================================= */
+const NOTAM_STATUS_WORD = { low: 'NORMAL', med: 'ATENÇÃO', high: 'CRÍTICO' };
+const NOTAM_IMPACT_TEXT = {
+  high: 'Impacto alto: pode causar atrasos, desvios ou mudança de pista — afeta a operação do aeroporto de forma direta.',
+  med: 'Impacto moderado: dificilmente perceptível por quem só está viajando, mas pilotos podem precisar de procedimento alternativo.',
+  low: 'Impacto baixo: normalmente não chega a afetar o passageiro comum.',
+};
+
+function buildNotamPlainSummary(notice, airport){
+  const sentences = [];
+  sentences.push(`Aviso para ${airport.city} (${airport.code}) — categoria: ${notice.category}.`);
+  sentences.push(`O que diz: ${notice.plain.replace(/\.+$/, '')}.`);
+
+  if(notice.validFrom){
+    const now = Date.now();
+    if(now < notice.validFrom.getTime()){
+      sentences.push(`Ainda não está em vigor — passa a valer ${describeRelativeDate(notice.validFrom)}.`);
+    } else if(notice.validUntil && now > notice.validUntil.getTime()){
+      sentences.push(`Esse período já encerrou (${describeRelativeDate(notice.validUntil)}) — pode estar desatualizado, vale conferir se saiu um boletim mais recente.`);
+    } else if(notice.validUntil){
+      sentences.push(`Em vigor agora — termina ${describeRelativeDate(notice.validUntil)}.`);
+    } else {
+      sentences.push(`Em vigor agora, sem data de término prevista.`);
+    }
+  } else {
+    sentences.push(`Válido: ${notice.validity}.`);
+  }
+
+  sentences.push(NOTAM_IMPACT_TEXT[notice.level] || '');
+  sentences.push(`STATUS: ${NOTAM_STATUS_WORD[notice.level] || '—'}.`);
+
+  return sentences.filter(Boolean).join(' ');
+}
+
+function toggleNotamSummary(){
+  notamSummaryOpen = !notamSummaryOpen;
+  render();
+}
+
+async function loadRealNotam(icao){
+  if(notamLoading[icao]) return;
+  notamLoading[icao] = true;
+  try{
+    const url = `${AISWEB_BASE}/?apiKey=${encodeURIComponent(AISWEB_API_KEY)}&apiPass=${encodeURIComponent(AISWEB_API_PASS)}&area=notam&icaoCode=${icao}`;
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const xmlDoc = new DOMParser().parseFromString(await resp.text(), 'text/xml');
+    if(xmlDoc.querySelector('parsererror')) throw new Error('XML inválido');
+    const items = [...xmlDoc.querySelectorAll('notam > item')];
+    REAL_NOTAM[icao] = { updated: 'agora mesmo', notices: items.map(parseNotamXmlItem) };
+  }catch(err){
+    console.warn('Falha ao buscar NOTAM real da AISWEB para', icao, err);
+    REAL_NOTAM[icao] = null; // marca como "tentou e falhou" -> cai no mock (ou "indisponível")
+  }finally{
+    notamLoading[icao] = false;
+    if(currentTab === 'notam' && currentCode === icao) render();
+  }
+}
+
+function getNotamData(icao){
+  if(REAL_NOTAM[icao]) return { ...REAL_NOTAM[icao], source: 'real' };
+  if(REAL_NOTAM[icao] === null){
+    return MOCK_NOTAM[icao] ? { ...MOCK_NOTAM[icao], source: 'fallback' } : { source: 'unavailable', notices: [] };
+  }
+  return MOCK_NOTAM[icao] ? { ...MOCK_NOTAM[icao], source: 'loading' } : { source: 'loading', notices: [] };
+}
+
+/* ---------- ROTAER ---------- */
+
+function rotaerRunwaysRows(doc){
+  const runways = [...doc.querySelectorAll('runway')];
+  if(runways.length === 0) return null;
+  const SURF_NAMES = { ASPH:'asfalto', CONC:'concreto', GRSS:'grama', GRVL:'cascalho' };
+  return runways.map(r => {
+    const ident = xmlText(r,'ident'), len = xmlText(r,'length'), wid = xmlText(r,'width'), surf = xmlText(r,'surface');
+    const surfName = SURF_NAMES[surf.toUpperCase()] || surf;
+    return `${ident} — ${len}${wid ? ' x ' + wid : ''} m, ${surfName}`;
+  }).join(' / ');
+}
+
+// só os idents (ex.: ["03/21","14/32"]), sem descrição — usado pelo diagrama ilustrativo
+function rotaerRunwayIdents(doc){
+  return [...doc.querySelectorAll('runway')].map(r => xmlText(r,'ident')).filter(Boolean);
+}
+
+function rotaerFreqRows(doc){
+  return [...doc.querySelectorAll('service[type="COM"]')].map(s => {
+    const type = xmlText(s, 'type');
+    const freqs = [...s.querySelectorAll('freq')].map(f => f.textContent.trim());
+    return freqs.length ? `${type}: ${freqs.join(' / ')} MHz` : null;
+  }).filter(Boolean);
+}
+
+function rotaerFuelRow(doc){
+  const spans = [...doc.querySelectorAll('service[type="AirportSuppliesService"] fuel span')];
+  const brands = spans.map(s => (s.getAttribute('title') || '').split(' - ')[0].trim()).filter(Boolean);
+  return brands.length ? brands.join(', ') : 'não informado';
+}
+
+function rotaerHoursRow(doc){
+  const sheets = [...doc.querySelectorAll('timesheet')];
+  if(sheets.length === 0) return 'não informado';
+  return sheets.map(t => {
+    const days = [...t.querySelectorAll('day')].map(d => d.textContent.trim()).join('/');
+    const begin = xmlText(t, 'begin'), end = xmlText(t, 'end');
+    return `${days || 'DLY'} ${begin}-${end}`;
+  }).join(', ');
+}
+
+function parseRotaerXml(doc){
+  const altFt = directChildText(doc, 'altFt');
+  const freqs = rotaerFreqRows(doc);
+  return {
+    nome: directChildText(doc, 'name') || '—',
+    elevacao: altFt ? `${altFt} ft` : '—',
+    pista: rotaerRunwaysRows(doc) || '—',
+    runwaysList: rotaerRunwayIdents(doc),
+    horario: rotaerHoursRow(doc),
+    freqTorre: freqs.find(f => /^Torre/i.test(f)) || freqs[0] || 'não informado',
+    freqAproximacao: freqs.find(f => /^(Aproxima|APP)/i.test(f)) || 'não informado',
+    combustivel: rotaerFuelRow(doc),
+  };
+}
+
+async function loadRealRotaer(icao){
+  if(rotaerLoading[icao]) return;
+  rotaerLoading[icao] = true;
+  try{
+    const url = `${AISWEB_BASE}/?apiKey=${encodeURIComponent(AISWEB_API_KEY)}&apiPass=${encodeURIComponent(AISWEB_API_PASS)}&area=rotaer&icaoCode=${icao}`;
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const xmlDoc = new DOMParser().parseFromString(await resp.text(), 'text/xml');
+    if(xmlDoc.querySelector('parsererror')) throw new Error('XML inválido');
+    if(!directChildText(xmlDoc, 'AeroCode')) throw new Error('aeródromo não encontrado na AISWEB');
+    REAL_ROTAER[icao] = parseRotaerXml(xmlDoc);
+  }catch(err){
+    console.warn('Falha ao buscar ROTAER real da AISWEB para', icao, err);
+    REAL_ROTAER[icao] = null;
+  }finally{
+    rotaerLoading[icao] = false;
+    if((currentTab === 'rotaer' || currentTab === 'notam') && currentCode === icao) render();
+  }
+}
+
+function getRotaerData(icao){
+  if(REAL_ROTAER[icao]) return { ...REAL_ROTAER[icao], source: 'real' };
+  if(REAL_ROTAER[icao] === null){
+    return MOCK_ROTAER[icao] ? { ...MOCK_ROTAER[icao], source: 'fallback' } : { source: 'unavailable' };
+  }
+  return MOCK_ROTAER[icao] ? { ...MOCK_ROTAER[icao], source: 'loading' } : { source: 'loading' };
+}
+
+/* ---------- Carta de Aeródromo (ADC) — link extra opcional, PDF oficial ---------- */
+// é só um link de referência pra quem quiser o documento técnico completo (ex.: pilotos),
+// não substitui o diagrama/resumo em linguagem simples que é o foco do app
+async function loadRealCartaAdc(icao){
+  if(cartaAdcLoading[icao]) return;
+  cartaAdcLoading[icao] = true;
+  try{
+    const url = `${AISWEB_BASE}/?apiKey=${encodeURIComponent(AISWEB_API_KEY)}&apiPass=${encodeURIComponent(AISWEB_API_PASS)}&area=cartas&icaoCode=${icao}`;
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const xmlDoc = new DOMParser().parseFromString(await resp.text(), 'text/xml');
+    if(xmlDoc.querySelector('parsererror')) throw new Error('XML inválido');
+    const adcItems = [...xmlDoc.querySelectorAll('cartas > item')].filter(it => xmlText(it,'tipo') === 'ADC');
+    if(adcItems.length === 0) throw new Error('sem carta ADC disponível pra este aeródromo');
+    // pega a mais recente (maior data de publicação) — pode haver mais de uma emenda catalogada
+    adcItems.sort((a,b) => xmlText(a,'dt').localeCompare(xmlText(b,'dt')));
+    REAL_CARTA_ADC[icao] = xmlText(adcItems[adcItems.length-1], 'link') || null;
+  }catch(err){
+    console.warn('Falha ao buscar Carta de Aeródromo (ADC) da AISWEB para', icao, err);
+    REAL_CARTA_ADC[icao] = null;
+  }finally{
+    cartaAdcLoading[icao] = false;
+    if((currentTab === 'notam' || currentTab === 'rotaer') && currentCode === icao) render();
+  }
+}
+
+function getCartaAdcUrl(icao){
+  return REAL_CARTA_ADC[icao] || null;
+}
+
+let currentNotamList = [];
+// estado (não DOM) dos botões "gerar resumo" — precisa viver aqui porque um fetch em
+// segundo plano (ex.: ROTAER/carta ADC terminando de carregar) chama render() de novo
+// e reconstrói o HTML; se o "aberto/fechado" morasse só na classList, uma resposta
+// chegando bem na hora do clique reconstruiria o bloco fechado por baixo do usuário
+let metarSummaryOpen = false;
+let notamSummaryOpen = false;
 
 let currentCode = "SBFL";
 let currentTab = "notam";
@@ -1228,28 +1553,59 @@ function renderChips(){
 
 /* ---------- SVGs de exemplo (placeholders ilustrativos) ---------- */
 
-function svgRunwayChart(affected){
-  const highlightMap = {
-    rwy32: {x:60, y:40, w:60, h:14},
-    rwy14: {x:60, y:126, w:60, h:14},
-    rwy09r:{x:40, y:80, w:220, h:10},
-    apron: {x:210, y:110, w:40, h:36},
-    airspace:{x:0,y:0,w:0,h:0},
-    nav: {x:250, y:70, w:16, h:16}
-  };
-  const hl = highlightMap[affected] || {x:0,y:0,w:0,h:0};
-  const highlightRect = hl.w ? `<rect x="${hl.x}" y="${hl.y}" width="${hl.w}" height="${hl.h}" rx="4" fill="none" stroke="#F2665A" stroke-width="2.5" stroke-dasharray="4 3"/>` : '';
+// rumo magnético aproximado de uma cabeceira a partir do seu número (ex.: "14" -> 140°,
+// "09R" -> 090°) — não é a orientação geográfica exata (isso exigiria coordenadas reais,
+// que a AISWEB não devolve pra pista), mas já desenha cada pista na direção certa
+// em vez do "14/32" fixo que era usado antes pra qualquer aeroporto
+function runwayHeadingDeg(identEnd){
+  const m = (identEnd || '').match(/^(\d{2})/);
+  return m ? parseInt(m[1], 10) * 10 : 90;
+}
+
+// desenha o diagrama de pistas de um aeródromo de verdade: uma barra por pista,
+// rotacionada conforme o rumo, com a(s) cabeceira(s) rotuladas nas pontas — e destaca
+// em vermelho a pista citada no NOTAM (via "affected"), quando houver uma
+function svgRunwayChart(affected, runwayIdents){
+  const idents = (runwayIdents && runwayIdents.length) ? runwayIdents : ['09/27'];
+  const affectedIdent = affected ? affected.replace(/^rwy/i, '').toUpperCase() : null;
+  const cx = 160, cy = 110, barLen = 170, barW = 13;
+  const n = idents.length;
+
+  const bars = idents.map((identPair, i) => {
+    const [endA, endB] = identPair.split('/');
+    const heading = runwayHeadingDeg(endA);
+    const rotation = heading - 90;
+    const rad = (heading * Math.PI) / 180;
+    // pistas paralelas (mesmo rumo) ficam sobrepostas se não deslocarmos uma das barras
+    // perpendicularmente ao rumo; pistas que se cruzam (rumos diferentes) não precisam disso
+    const offset = n > 1 ? (i - (n-1)/2) * 32 : 0;
+    const bcx = cx + Math.cos(rad)*offset, bcy = cy + Math.sin(rad)*offset;
+    const halfLen = barLen/2 + 14;
+    const ex1 = bcx - Math.sin(rad)*halfLen, ey1 = bcy + Math.cos(rad)*halfLen;
+    const ex2 = bcx + Math.sin(rad)*halfLen, ey2 = bcy - Math.cos(rad)*halfLen;
+    const isHighlighted = affectedIdent && (endA.toUpperCase() === affectedIdent || endB.toUpperCase() === affectedIdent || identPair.toUpperCase() === affectedIdent);
+
+    return `
+      <rect x="${bcx-barLen/2}" y="${bcy-barW/2}" width="${barLen}" height="${barW}" rx="2"
+        fill="${isHighlighted ? '#3A2A22' : '#2B3A56'}"
+        stroke="${isHighlighted ? '#F2665A' : 'none'}" stroke-width="${isHighlighted ? 2.5 : 0}"
+        ${isHighlighted ? 'stroke-dasharray="5 3"' : ''}
+        transform="rotate(${rotation} ${bcx} ${bcy})"/>
+      <text x="${ex1}" y="${ey1}" fill="#7C8AA5" font-size="9" font-family="monospace" text-anchor="middle">${endA}</text>
+      <text x="${ex2}" y="${ey2}" fill="#7C8AA5" font-size="9" font-family="monospace" text-anchor="middle">${endB}</text>`;
+  }).join('');
+
+  // categorias que não são pista (pátio, espaço aéreo, navegação) não têm coordenada real
+  // disponível — mostra um selo textual simples em vez de fingir uma posição exata
+  const nonRunwayLabel = { apron: 'PÁTIO', airspace: 'ESPAÇO AÉREO', nav: 'AUXÍLIO À NAVEGAÇÃO', twy: 'PISTA DE TÁXI' }[affected];
+  const nonRunwayTag = nonRunwayLabel ? `<rect x="10" y="10" width="${18+nonRunwayLabel.length*5.6}" height="18" rx="9" fill="rgba(242,102,90,0.15)" stroke="#F2665A"/><text x="19" y="23" fill="#F2665A" font-size="9.5" font-family="monospace">${nonRunwayLabel}</text>` : '';
+
   return `
-  <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
-    <rect width="320" height="180" fill="#0B111E"/>
-    <rect x="20" y="60" width="280" height="20" rx="2" fill="#2B3A56"/>
-    <rect x="20" y="118" width="280" height="20" rx="2" fill="#2B3A56"/>
-    <rect x="200" y="80" width="90" height="60" rx="6" fill="#1B2740" stroke="#263352"/>
-    <rect x="30" y="20" width="60" height="30" rx="4" fill="#1B2740" stroke="#263352"/>
-    <text x="24" y="55" fill="#7C8AA5" font-size="9" font-family="monospace">14</text>
-    <text x="290" y="55" fill="#7C8AA5" font-size="9" font-family="monospace">32</text>
-    <text x="215" y="95" fill="#7C8AA5" font-size="9" font-family="monospace">PÁTIO</text>
-    ${highlightRect}
+  <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg">
+    <rect width="320" height="220" fill="#0B111E"/>
+    <circle cx="${cx}" cy="${cy}" r="3" fill="#263352"/>
+    ${bars}
+    ${nonRunwayTag}
   </svg>`;
 }
 
@@ -1294,6 +1650,11 @@ function render(){
       }
     }
   }
+  if(currentTab === 'notam' && REAL_NOTAM[currentCode] === undefined) loadRealNotam(currentCode);
+  // ROTAER também é buscada na aba NOTAM (não só na aba ROTAER): o diagrama de pista
+  // do detalhe do NOTAM precisa saber a configuração real de pistas do aeródromo
+  if((currentTab === 'rotaer' || currentTab === 'notam') && REAL_ROTAER[currentCode] === undefined) loadRealRotaer(currentCode);
+  if((currentTab === 'rotaer' || currentTab === 'notam') && REAL_CARTA_ADC[currentCode] === undefined) loadRealCartaAdc(currentCode);
 
   if(currentView === 'notam-detail'){
     renderNotamDetail(main, airport);
@@ -1302,9 +1663,15 @@ function render(){
 
   // view padrão: lista
   let updated = "—";
-  if(currentTab === "notam") updated = (MOCK_NOTAM[currentCode] || {}).updated || "—";
+  if(currentTab === "notam"){
+    const nd = getNotamData(currentCode);
+    updated = nd.updated || (nd.source === 'unavailable' ? '—' : 'carregando...');
+  }
   if(currentTab === "metar") updated = (getMetarData(currentCode) || {}).updated || "—";
-  if(currentTab === "rotaer") updated = "ficha estática";
+  if(currentTab === "rotaer"){
+    const rd = getRotaerData(currentCode);
+    updated = rd.source === 'real' ? 'dado oficial — AISWEB' : rd.source === 'fallback' ? 'ficha de exemplo' : rd.source === 'unavailable' ? '—' : 'carregando...';
+  }
 
   main.innerHTML = `
     <div class="airport-banner">
@@ -1319,9 +1686,9 @@ function render(){
   `;
   renderTabs();
 
-  if(currentTab === "notam") renderNotamList(MOCK_NOTAM[currentCode]);
+  if(currentTab === "notam") renderNotamList(getNotamData(currentCode));
   if(currentTab === "metar") renderMetarSection(airport);
-  if(currentTab === "rotaer") renderRotaer(MOCK_ROTAER[currentCode]);
+  if(currentTab === "rotaer") renderRotaer(getRotaerData(currentCode));
 }
 
 function renderTabs(){
@@ -1338,15 +1705,23 @@ function renderTabs(){
 
 function renderNotamList(data){
   const sections = document.getElementById('sections');
-  if(!data){
-    sections.innerHTML = `<div class="empty"><div class="icon">—</div>NOTAM real ainda não disponível para este aeroporto (aguardando integração com a API-AISWEB).</div>`;
+  if(!data || data.source === 'loading'){
+    currentNotamList = [];
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Carregando NOTAM da AISWEB...</div>`;
     return;
   }
+  if(data.source === 'unavailable'){
+    currentNotamList = [];
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Não foi possível carregar NOTAM da AISWEB para este aeroporto no momento.</div>`;
+    return;
+  }
+  currentNotamList = data.notices;
+  const sourceHtml = sourceTagHtml(data.source, 'AISWEB');
   if(data.notices.length === 0){
-    sections.innerHTML = `<div class="empty"><div class="icon">✓</div>Nenhum aviso relevante no momento para este aeroporto.</div>`;
+    sections.innerHTML = sourceHtml + `<div class="empty"><div class="icon">✓</div>Nenhum aviso relevante no momento para este aeroporto.</div>`;
     return;
   }
-  sections.innerHTML = `<div class="section-label">Avisos ativos · ${data.notices.length}</div>` +
+  sections.innerHTML = sourceHtml + `<div class="section-label">Avisos ativos · ${data.notices.length}</div>` +
     data.notices.map((n, i) => `
       <div class="card ${n.level}">
         <div class="card-top">
@@ -1475,9 +1850,9 @@ function renderMetarResumo(data, airport){
       </div>
     </div>
     <div class="btn-summary" onclick="toggleMetarSummary()">
-      <span class="ic">✨</span><span id="btnSummaryLabel">Gerar resumo em linguagem simples</span>
+      <span class="ic">✨</span><span id="btnSummaryLabel">${metarSummaryOpen ? 'Ocultar resumo' : 'Gerar resumo em linguagem simples'}</span>
     </div>
-    <div class="plain-block summary" id="metarSummaryBlock">${summaryText}</div>
+    <div class="plain-block summary${metarSummaryOpen ? ' show' : ''}" id="metarSummaryBlock">${summaryText}</div>
     <div class="metar-grid">
       <div class="metar-stat"><div class="label">Vento</div><div class="value">${data.wind} <span>${data.windSpeed}</span></div></div>
       <div class="metar-stat"><div class="label">Visibilidade</div><div class="value">${data.visibility}</div></div>
@@ -1493,10 +1868,8 @@ function renderMetarResumo(data, airport){
 }
 
 function toggleMetarSummary(){
-  const block = document.getElementById('metarSummaryBlock');
-  const label = document.getElementById('btnSummaryLabel');
-  const showing = block.classList.toggle('show');
-  label.textContent = showing ? 'Ocultar resumo' : 'Gerar resumo em linguagem simples';
+  metarSummaryOpen = !metarSummaryOpen;
+  render();
 }
 
 function renderMetarImagem(metarData){
@@ -1550,8 +1923,12 @@ function renderMetarImagem(metarData){
 
 function renderRotaer(data){
   const sections = document.getElementById('sections');
-  if(!data){
-    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Sem ficha ROTAER disponível.</div>`;
+  if(!data || data.source === 'loading'){
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Carregando ficha ROTAER da AISWEB...</div>`;
+    return;
+  }
+  if(data.source === 'unavailable'){
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Sem ficha ROTAER disponível para este aeroporto.</div>`;
     return;
   }
   const rows = [
@@ -1559,11 +1936,17 @@ function renderRotaer(data){
     ["Horário de funcionamento", data.horario], ["Frequência Torre", data.freqTorre],
     ["Frequência Aproximação", data.freqAproximacao], ["Combustível disponível", data.combustivel],
   ];
+  const cartaUrl = getCartaAdcUrl(currentCode);
   sections.innerHTML = `
     <div class="section-label">Ficha do aeródromo</div>
+    ${sourceTagHtml(data.source, 'AISWEB')}
     <div class="rotaer-card">
       ${rows.map(([k,v]) => `<div class="rotaer-row"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('')}
     </div>
+    ${cartaUrl ? `
+    <div class="link-row">
+      <a href="${cartaUrl}" target="_blank" rel="noopener" class="link-detail" style="text-decoration:none;">Ver Carta de Aeródromo oficial (PDF, técnico)</a>
+    </div>` : ''}
   `;
 }
 
@@ -1572,6 +1955,7 @@ function renderRotaer(data){
 function openNotamDetail(i){
   currentNotamIndex = i;
   currentView = 'notam-detail';
+  notamSummaryOpen = false;
   render();
 }
 function backToList(){
@@ -1580,7 +1964,16 @@ function backToList(){
 }
 
 function renderNotamDetail(main, airport){
-  const n = MOCK_NOTAM[currentCode].notices[currentNotamIndex];
+  const n = currentNotamList[currentNotamIndex];
+  const rotaerData = getRotaerData(currentCode);
+  const runwaysList = rotaerData && rotaerData.runwaysList;
+  const geoLink = n.geoUrl
+    ? ` <a href="${n.geoUrl}" target="_blank" rel="noopener" style="color:var(--blue);">Ver localização exata no mapa oficial (DECEA)</a>.`
+    : '';
+  const cartaUrl = getCartaAdcUrl(currentCode);
+  const cartaLink = cartaUrl
+    ? ` <a href="${cartaUrl}" target="_blank" rel="noopener" style="color:var(--blue);">Ver Carta de Aeródromo oficial (PDF, técnico)</a>.`
+    : '';
   main.innerHTML = `
     <div class="back-btn" onclick="backToList()">voltar</div>
     <div class="detail-header">
@@ -1591,9 +1984,14 @@ function renderNotamDetail(main, airport){
       </div>
     </div>
 
+    <div class="btn-summary" onclick="toggleNotamSummary()">
+      <span class="ic">✨</span><span id="btnNotamSummaryLabel">${notamSummaryOpen ? 'Ocultar resumo' : 'Gerar resumo em linguagem simples'}</span>
+    </div>
+    <div class="plain-block summary${notamSummaryOpen ? ' show' : ''}" id="notamSummaryBlock">${buildNotamPlainSummary(n, airport)}</div>
+
     <div class="section-label">Carta do aeródromo</div>
-    <div class="image-frame">${svgRunwayChart(n.affected)}</div>
-    <div class="image-caption">Diagrama ilustrativo com a área destacada em vermelho. <b>Em produção, viria da carta oficial (serviço "cartas" da API-AISWEB).</b></div>
+    <div class="image-frame">${svgRunwayChart(n.affected, runwaysList)}</div>
+    <div class="image-caption">Diagrama esquemático com a(s) pista(s) real(is) do aeródromo${n.affected && n.affected.startsWith('rwy') ? ', pista citada no aviso destacada em vermelho' : ''}.${geoLink}${cartaLink}</div>
 
     <div class="section-label">Em linguagem simples</div>
     <div class="plain-block">${n.full}</div>
@@ -1618,7 +2016,9 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
   const q = normalizeSearch(e.target.value);
   if(!q) return;
   const match = AIRPORTS.find(a => normalizeSearch(a.code).includes(q) || normalizeSearch(a.city).includes(q));
-  if(match){ currentCode = match.code; currentView='list'; render(); }
+  // ao achar pela busca, volta pra aba NOTAM — senão o usuário troca de aeroporto mas
+  // continua vendo a aba (ex.: ROTAER) em que já estava, e parece que "não tem NOTAM"
+  if(match){ currentCode = match.code; currentTab = 'notam'; currentView='list'; render(); }
 });
 
 /* =========================================================
