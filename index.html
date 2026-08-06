@@ -778,6 +778,13 @@ const AISWEB_BASE = "https://aisweb.decea.mil.br/api";
 // undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
 const REAL_NOTAM = {};
 const notamLoading = {};
+// histórico completo de NOTAM (ativos + expirados + cancelados) por ICAO, usado pelo
+// seletor "Escolher data" — a API não filtra por data diretamente; busca-se tudo uma
+// vez por aeródromo e filtra-se no cliente por qual aviso estava em vigor na data
+// escolhida (comparando com validFrom/validUntil, já calculados por parseNotamXmlItem)
+// undefined = ainda não buscou | null = tentou e falhou | array = lista completa
+const HISTORIC_NOTAM_ALL = {};
+const notamHistoricLoading = {};
 const REAL_ROTAER = {};
 const rotaerLoading = {};
 // link do PDF da Carta de Aeródromo (ADC) oficial — undefined = não tentou | null = falhou/não achou | string = URL
@@ -1493,8 +1500,12 @@ function notamFieldToDate(s){
   const p = parseNotamDateField(s);
   return p ? new Date(Date.UTC(p.y, p.mo-1, p.d, p.h, p.mi)) : null;
 }
-function describeRelativeDate(date){
-  const days = Math.round((date.getTime() - Date.now()) / 86400000);
+// refTime opcional: timestamp usado como "agora" pra calcular a distância em dias —
+// no modo histórico do NOTAM, passamos o meio-dia da data escolhida em vez do
+// horário real, pra frase ficar coerente com o dia que o usuário está revendo
+function describeRelativeDate(date, refTime){
+  const ref = refTime === undefined ? Date.now() : refTime;
+  const days = Math.round((date.getTime() - ref) / 86400000);
   if(days === 0) return 'hoje';
   if(days > 0) return days === 1 ? 'amanhã' : `em ${days} dias`;
   return days === -1 ? 'ontem' : `há ${Math.abs(days)} dias`;
@@ -1521,6 +1532,8 @@ function parseNotamXmlItem(item){
   const rwyMatch = e.match(/\bRWY\s*(\d{2}[LRC]?)\/(\d{2}[LRC]?)/i);
   const affected = rwyMatch ? `rwy${rwyMatch[1]}` : /\bAPRON\b/i.test(e) ? 'apron' : /\bTWY\b/i.test(e) ? 'twy' : null;
   return {
+    id: xmlText(item, 'id'),
+    tp: xmlText(item, 'tp'),
     level,
     title: translated.length > 90 ? translated.slice(0, 87) + '...' : translated,
     plain: translated,
@@ -1548,21 +1561,27 @@ const NOTAM_IMPACT_TEXT = {
   low: 'Impacto baixo: normalmente não chega a afetar o passageiro comum.',
 };
 
-function buildNotamPlainSummary(notice, airport){
+// refTime opcional: quando vem de uma consulta histórica (aba "Escolher data"),
+// passa-se o meio-dia da data escolhida em vez de usar o horário real — assim o
+// resumo fala da vigência "naquela data", não do momento em que o usuário está lendo
+function buildNotamPlainSummary(notice, airport, refTime){
+  const isHistoric = refTime !== undefined;
+  const ref = isHistoric ? refTime : Date.now();
   const sentences = [];
   sentences.push(`Aviso para ${airport.city} (${airport.code}) — categoria: ${notice.category}.`);
   sentences.push(`O que diz: ${notice.plain.replace(/\.+$/, '')}.`);
 
   if(notice.validFrom){
-    const now = Date.now();
-    if(now < notice.validFrom.getTime()){
-      sentences.push(`Ainda não está em vigor — passa a valer ${describeRelativeDate(notice.validFrom)}.`);
-    } else if(notice.validUntil && now > notice.validUntil.getTime()){
-      sentences.push(`Esse período já encerrou (${describeRelativeDate(notice.validUntil)}) — pode estar desatualizado, vale conferir se saiu um boletim mais recente.`);
+    if(ref < notice.validFrom.getTime()){
+      sentences.push(`${isHistoric ? 'Nessa data, ainda não estava em vigor' : 'Ainda não está em vigor'} — passa a valer ${describeRelativeDate(notice.validFrom, ref)}.`);
+    } else if(notice.validUntil && ref > notice.validUntil.getTime()){
+      sentences.push(isHistoric
+        ? `Nessa data, esse período já tinha encerrado (${describeRelativeDate(notice.validUntil, ref)}).`
+        : `Esse período já encerrou (${describeRelativeDate(notice.validUntil)}) — pode estar desatualizado, vale conferir se saiu um boletim mais recente.`);
     } else if(notice.validUntil){
-      sentences.push(`Em vigor agora — termina ${describeRelativeDate(notice.validUntil)}.`);
+      sentences.push(`${isHistoric ? 'Em vigor nessa data' : 'Em vigor agora'} — termina ${describeRelativeDate(notice.validUntil, ref)}.`);
     } else {
-      sentences.push(`Em vigor agora, sem data de término prevista.`);
+      sentences.push(`${isHistoric ? 'Em vigor nessa data' : 'Em vigor agora'}, sem data de término prevista.`);
     }
   } else {
     sentences.push(`Válido: ${notice.validity}.`);
@@ -1605,6 +1624,89 @@ function getNotamData(icao){
     return MOCK_NOTAM[icao] ? { ...MOCK_NOTAM[icao], source: 'fallback' } : { source: 'unavailable', notices: [] };
   }
   return MOCK_NOTAM[icao] ? { ...MOCK_NOTAM[icao], source: 'loading' } : { source: 'loading', notices: [] };
+}
+
+// a API-AISWEB não tem parâmetro de data pra NOTAM — em vez disso, o filtro "status"
+// separa os avisos em três grupos que juntos cobrem o histórico completo do aeródromo:
+// sem parâmetro = só os ativos agora; status=ALL = os que já expiraram naturalmente;
+// status=CANCELLED = os que foram cancelados antes do prazo. Buscamos os três e juntamos
+// (descartando duplicata por id) pra ter a base completa e filtrar por data no cliente.
+async function loadNotamHistory(icao){
+  if(notamHistoricLoading[icao] || HISTORIC_NOTAM_ALL[icao] !== undefined) return;
+  notamHistoricLoading[icao] = true;
+  try{
+    const statusParams = ['', '&status=ALL', '&status=CANCELLED'];
+    const batches = await Promise.all(statusParams.map(async (sp, idx) => {
+      const url = `${AISWEB_BASE}/?apiKey=${encodeURIComponent(AISWEB_API_KEY)}&apiPass=${encodeURIComponent(AISWEB_API_PASS)}&area=notam&icaoCode=${icao}${sp}`;
+      const resp = await fetch(url);
+      if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const xmlDoc = new DOMParser().parseFromString(await resp.text(), 'text/xml');
+      if(xmlDoc.querySelector('parsererror')) throw new Error('XML inválido');
+      // idx 0 = lote sem filtro de status = os que a própria AISWEB considera
+      // ativos agora; marcamos pra confiar num prazo em aberto (sem C) só nesse caso
+      return [...xmlDoc.querySelectorAll('notam > item')].map(item => {
+        const notice = parseNotamXmlItem(item);
+        notice.currentlyActive = idx === 0;
+        return notice;
+      });
+    }));
+    const seenIds = new Set();
+    const all = [];
+    batches.flat().forEach(notice => {
+      if(notice.id && seenIds.has(notice.id)) return;
+      if(notice.id) seenIds.add(notice.id);
+      // NOTAMC é só um ponteiro administrativo avisando que outro NOTAM foi
+      // cancelado — não é, em si, um aviso operacional com janela de vigência própria
+      if(notice.tp === 'NOTAMC') return;
+      all.push(notice);
+    });
+    HISTORIC_NOTAM_ALL[icao] = all;
+  }catch(err){
+    console.warn('Falha ao buscar histórico de NOTAM da AISWEB para', icao, err);
+    HISTORIC_NOTAM_ALL[icao] = null;
+  }finally{
+    notamHistoricLoading[icao] = false;
+    if(currentTab === 'notam' && notamMode === 'historic' && currentCode === icao) render();
+  }
+}
+
+// início/fim (em UTC) do dia local em Brasília escolhido pelo usuário — mesma janela
+// usada pra saber se um NOTAM estava em vigor "naquele dia"
+function localDateDayRangeUTC(date){
+  const [y, m, d] = date.split('-').map(Number);
+  const start = new Date(Date.UTC(y, m-1, d, BRT_OFFSET_HOURS, 0, 0));
+  const end = new Date(Date.UTC(y, m-1, d, 23 + BRT_OFFSET_HOURS, 59, 59));
+  return { start, end };
+}
+
+function getHistoricNotamData(icao, date){
+  const list = HISTORIC_NOTAM_ALL[icao];
+  if(list === undefined) return { source: 'loading', notices: [] };
+  if(list === null) return { source: 'unavailable', notices: [] };
+  const { start, end } = localDateDayRangeUTC(date);
+  const notices = list
+    .filter(n => {
+      if(!n.validFrom) return false; // sem B) confiável, não dá pra situar no calendário
+      const from = n.validFrom.getTime();
+      if(!n.validUntil){
+        // C) em aberto (ausente, ou "PERM") só é confiável quando o item veio do
+        // lote "ativo agora" da própria AISWEB — pros expirados/cancelados do arquivo,
+        // um C) em aberto não quer dizer que segue valendo até hoje
+        if(!n.currentlyActive) return false;
+        return from <= end.getTime();
+      }
+      const until = n.validUntil.getTime();
+      return from <= end.getTime() && until >= start.getTime();
+    })
+    .sort((a, b) => a.validFrom.getTime() - b.validFrom.getTime());
+  const [y, m, d] = date.split('-');
+  return { source: 'historic', notices, updated: `vigentes em ${d}/${m}/${y}` };
+}
+
+function getCurrentNotamData(){
+  return notamMode === 'historic'
+    ? getHistoricNotamData(currentCode, notamHistoricDate || todayLocalDateStr())
+    : getNotamData(currentCode);
 }
 
 /* ---------- ROTAER ---------- */
@@ -2197,6 +2299,9 @@ let metarMode = "live";    // 'live' | 'historic'
 let historicDate = null;   // 'YYYY-MM-DD' (UTC)
 let historicHour = null;   // 0-23 (UTC), horário escolhido dentro do dia
 
+let notamMode = "live";         // 'live' | 'historic'
+let notamHistoricDate = null;   // 'YYYY-MM-DD' (Brasília)
+
 /* =========================================================
    MAPA AO VIVO — tráfego aéreo em tempo real (airplanes.live,
    agregador comunitário de dados ADS-B/MLAT)
@@ -2352,7 +2457,10 @@ function render(){
       }
     }
   }
-  if(currentTab === 'notam' && REAL_NOTAM[currentCode] === undefined) loadRealNotam(currentCode);
+  if(currentTab === 'notam'){
+    if(REAL_NOTAM[currentCode] === undefined) loadRealNotam(currentCode);
+    if(notamMode === 'historic' && HISTORIC_NOTAM_ALL[currentCode] === undefined) loadNotamHistory(currentCode);
+  }
   // ROTAER também é buscada na aba NOTAM (não só na aba ROTAER): o diagrama de pista
   // do detalhe do NOTAM precisa saber a configuração real de pistas do aeródromo
   if((currentTab === 'rotaer' || currentTab === 'notam') && REAL_ROTAER[currentCode] === undefined) loadRealRotaer(currentCode);
@@ -2366,7 +2474,7 @@ function render(){
   // view padrão: lista
   let updated = "—";
   if(currentTab === "notam"){
-    const nd = getNotamData(currentCode);
+    const nd = getCurrentNotamData();
     updated = nd.updated || (nd.source === 'unavailable' ? '—' : 'carregando...');
   }
   if(currentTab === "metar") updated = (getMetarData(currentCode) || {}).updated || "—";
@@ -2388,7 +2496,7 @@ function render(){
   `;
   renderTabs();
 
-  if(currentTab === "notam") renderNotamList(getNotamData(currentCode));
+  if(currentTab === "notam") renderNotamSection();
   if(currentTab === "metar") renderMetarSection(airport);
   if(currentTab === "rotaer") renderRotaer(getRotaerData(currentCode));
 }
@@ -2405,25 +2513,69 @@ function renderTabs(){
   });
 }
 
-function renderNotamList(data){
+function renderNotamSection(){
   const sections = document.getElementById('sections');
+  sections.innerHTML = `<div class="date-nav" id="notamDateNav"></div><div id="notamListWrap"></div>`;
+  renderNotamDateNav();
+  renderNotamList(getCurrentNotamData());
+}
+
+function renderNotamDateNav(){
+  const wrap = document.getElementById('notamDateNav');
+  const today = todayLocalDateStr();
+  wrap.innerHTML = `
+    <div class="date-toggle">
+      <div class="date-opt ${notamMode === 'live' ? 'active' : ''}" id="notamModeLive">Agora</div>
+      <div class="date-opt ${notamMode === 'historic' ? 'active' : ''}" id="notamModeHistoric">Escolher data</div>
+    </div>
+    ${notamMode === 'historic' ? `
+      <div class="date-picker">
+        <input type="date" id="notamDateInput" class="date-input" max="${today}" value="${notamHistoricDate || today}">
+        <div class="hour-hint">Avisos em vigor nessa data (Brasília, UTC-3)</div>
+      </div>
+    ` : ''}
+  `;
+  document.getElementById('notamModeLive').onclick = () => { notamMode = 'live'; render(); };
+  document.getElementById('notamModeHistoric').onclick = () => {
+    notamMode = 'historic';
+    if(!notamHistoricDate) notamHistoricDate = today;
+    render();
+  };
+  if(notamMode === 'historic'){
+    document.getElementById('notamDateInput').onchange = (e) => {
+      notamHistoricDate = e.target.value;
+      render();
+    };
+  }
+}
+
+function renderNotamList(data){
+  const sections = document.getElementById('notamListWrap');
   if(!data || data.source === 'loading'){
     currentNotamList = [];
-    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Carregando NOTAM da AISWEB...</div>`;
+    const msg = notamMode === 'historic' ? 'Carregando histórico de NOTAM da AISWEB...' : 'Carregando NOTAM da AISWEB...';
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>${msg}</div>`;
     return;
   }
   if(data.source === 'unavailable'){
     currentNotamList = [];
-    sections.innerHTML = `<div class="empty"><div class="icon">—</div>Não foi possível carregar NOTAM da AISWEB para este aeroporto no momento.</div>`;
+    const msg = notamMode === 'historic'
+      ? 'Não foi possível carregar o histórico de NOTAM da AISWEB para este aeroporto.'
+      : 'Não foi possível carregar NOTAM da AISWEB para este aeroporto no momento.';
+    sections.innerHTML = `<div class="empty"><div class="icon">—</div>${msg}</div>`;
     return;
   }
   currentNotamList = data.notices;
   const sourceHtml = sourceTagHtml(data.source, 'AISWEB');
   if(data.notices.length === 0){
-    sections.innerHTML = sourceHtml + `<div class="empty"><div class="icon">✓</div>Nenhum aviso relevante no momento para este aeroporto.</div>`;
+    const msg = notamMode === 'historic'
+      ? 'Nenhum aviso em vigor nesta data para este aeroporto.'
+      : 'Nenhum aviso relevante no momento para este aeroporto.';
+    sections.innerHTML = sourceHtml + `<div class="empty"><div class="icon">✓</div>${msg}</div>`;
     return;
   }
-  sections.innerHTML = sourceHtml + `<div class="section-label">Avisos ativos · ${data.notices.length}</div>` +
+  const label = notamMode === 'historic' ? 'Avisos em vigor nesta data' : 'Avisos ativos';
+  sections.innerHTML = sourceHtml + `<div class="section-label">${label} · ${data.notices.length}</div>` +
     data.notices.map((n, i) => `
       <div class="card ${n.level}">
         <div class="card-top">
@@ -2677,6 +2829,11 @@ function renderNotamDetail(main, airport){
   const cartaLink = cartaUrl
     ? ` <a href="${cartaUrl}" target="_blank" rel="noopener" style="color:var(--blue);">Ver Carta de Aeródromo oficial (PDF, técnico)</a>.`
     : '';
+  let summaryRefTime;
+  if(notamMode === 'historic' && notamHistoricDate){
+    const { start, end } = localDateDayRangeUTC(notamHistoricDate);
+    summaryRefTime = (start.getTime() + end.getTime()) / 2; // meio-dia local da data escolhida
+  }
   main.innerHTML = `
     <div class="back-btn" onclick="backToList()">voltar</div>
     <div class="detail-header">
@@ -2690,7 +2847,7 @@ function renderNotamDetail(main, airport){
     <div class="btn-summary" onclick="toggleNotamSummary()">
       <span class="ic">✨</span><span id="btnNotamSummaryLabel">${notamSummaryOpen ? 'Ocultar resumo' : 'Gerar resumo em linguagem simples'}</span>
     </div>
-    <div class="plain-block summary${notamSummaryOpen ? ' show' : ''}" id="notamSummaryBlock">${buildNotamPlainSummary(n, airport)}</div>
+    <div class="plain-block summary${notamSummaryOpen ? ' show' : ''}" id="notamSummaryBlock">${buildNotamPlainSummary(n, airport, summaryRefTime)}</div>
 
     <div class="section-label">Carta do aeródromo</div>
     <div class="image-frame">${svgRunwayChart(n.affected, runwaysList)}</div>
