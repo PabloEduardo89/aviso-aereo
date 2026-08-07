@@ -2612,6 +2612,13 @@ function renderNotamList(data){
 
 function renderMetarSection(airport){
   const sections = document.getElementById('sections');
+  // precisa desmontar o mapa Leaflet ANTES de substituir o innerHTML abaixo — se o
+  // container dele for arrancado do DOM primeiro, o .remove() roda num nó órfão e
+  // deixa listeners/observers do Leaflet presos
+  if(sateliteMapInstance){
+    sateliteMapInstance.remove();
+    sateliteMapInstance = null;
+  }
   sections.innerHTML = `
     <div class="date-nav" id="dateNav"></div>
     <div class="subtabs" id="metarSubtabs"></div>
@@ -2746,14 +2753,6 @@ function renderMetarImagem(metarData){
   const isLive = metarMode === 'live';
   const showMap = isLive && sat.source === 'real' && airport;
   const hasStaticImage = !isLive && sat.source === 'historic';
-
-  // o mini-mapa Leaflet vive dentro do innerHTML abaixo, que é recriado a cada
-  // render — sempre desmonta a instância anterior antes de trocar o conteúdo, senão
-  // o Leaflet fica preso a um nó de DOM que já foi substituído
-  if(sateliteMapInstance){
-    sateliteMapInstance.remove();
-    sateliteMapInstance = null;
-  }
 
   const frame = showMap
     ? `<div class="map-wrap sat-mini" id="satMapWrap"><div id="satMap" style="width:100%; height:100%;"></div></div>`
