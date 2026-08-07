@@ -442,7 +442,12 @@
     margin-bottom: 8px;
     overflow:hidden;
   }
-  .image-frame svg{ width:100%; height:auto; display:block; border-radius:8px; }
+  /* seletor de filho direto: a ilustração SVG de fallback é filha direta do
+     .image-frame, mas o mini-mapa Leaflet também mora aqui dentro e tem seu
+     próprio SVG minúsculo (ícone de atribuição) lá no fundo do DOM — sem o
+     ">" esse mesmo width:100%/height:auto esticava aquele ícone pro tamanho
+     do mapa inteiro */
+  .image-frame > svg{ width:100%; height:auto; display:block; border-radius:8px; }
   .image-caption{
     font-size: 11px;
     color: var(--muted);
@@ -560,6 +565,9 @@
     border-color: var(--line) !important;
   }
   .map-wrap .leaflet-control-zoom a:hover{ background: var(--panel); color: var(--amber); }
+
+  /* ---- mini-mapa de satélite (aba METAR > Imagem de satélite) ---- */
+  .map-wrap.sat-mini{ height: 280px; }
 
   .aircraft-icon{
     position:relative;
@@ -751,10 +759,12 @@ const REDEMET_BASE = "https://api-redemet.decea.mil.br";
 const REAL_METAR = {};
 const metarLoading = {};
 
-// imagem de satélite é um produto único (cobertura do Brasil), não varia por aeroporto
+// imagem de satélite "ao vivo" vem da NASA GIBS (tiles WMTS, ver loadGibsSatelite);
+// aqui guardamos só o horário real da imagem mais recente, lido do header HTTP
 // undefined = ainda não tentou buscar | null = tentou e falhou | objeto = dado real ok
-let REAL_SATELITE = undefined;
-let sateliteLoading = false;
+let GIBS_SATELITE = undefined;
+let gibsSateliteLoading = false;
+let sateliteMapInstance = null;
 
 // cache de consultas históricas (METAR de um dia inteiro / satélite de um horário exato)
 // chave METAR: "ICAO_YYYY-MM-DD" -> undefined | null | [{hour, recebimento, parsed}]
@@ -798,45 +808,45 @@ const FEATURED_CODES = ["SBFL", "SBGR", "SBRJ", "SBBR", "SBCF"];
 // METAR real (REDEMET) funciona para qualquer ICAO aqui; NOTAM/ROTAER ficam com aviso de
 // "ainda não integrado" até termos a API-AISWEB e uma ficha ROTAER própria de cada um.
 const AIRPORTS = [
-  { code: "SBFL", city: "Florianópolis", uf: "SC" },
-  { code: "SBGR", city: "Guarulhos (São Paulo)", uf: "SP" },
-  { code: "SBRJ", city: "Santos Dumont (Rio de Janeiro)", uf: "RJ" },
-  { code: "SBBR", city: "Brasília", uf: "DF" },
-  { code: "SBCF", city: "Confins (Belo Horizonte)", uf: "MG" },
-  { code: "SBRB", city: "Rio Branco", uf: "AC" },
-  { code: "SBMO", city: "Maceió", uf: "AL" },
-  { code: "SBMQ", city: "Macapá", uf: "AP" },
-  { code: "SBEG", city: "Manaus", uf: "AM" },
-  { code: "SBSV", city: "Salvador", uf: "BA" },
-  { code: "SBFZ", city: "Fortaleza", uf: "CE" },
-  { code: "SBVT", city: "Vitória", uf: "ES" },
-  { code: "SBGO", city: "Goiânia", uf: "GO" },
-  { code: "SBSL", city: "São Luís", uf: "MA" },
-  { code: "SBCY", city: "Cuiabá", uf: "MT" },
-  { code: "SBCG", city: "Campo Grande", uf: "MS" },
-  { code: "SBBE", city: "Belém", uf: "PA" },
-  { code: "SBJP", city: "João Pessoa", uf: "PB" },
-  { code: "SBCT", city: "Curitiba", uf: "PR" },
-  { code: "SBRF", city: "Recife", uf: "PE" },
-  { code: "SBTE", city: "Teresina", uf: "PI" },
-  { code: "SBGL", city: "Galeão (Rio de Janeiro)", uf: "RJ" },
-  { code: "SBSG", city: "Natal", uf: "RN" },
-  { code: "SBPA", city: "Porto Alegre", uf: "RS" },
-  { code: "SBPV", city: "Porto Velho", uf: "RO" },
-  { code: "SBBV", city: "Boa Vista", uf: "RR" },
-  { code: "SBSP", city: "Congonhas (São Paulo)", uf: "SP" },
-  { code: "SBAR", city: "Aracaju", uf: "SE" },
-  { code: "SBPJ", city: "Palmas", uf: "TO" },
-  { code: "SBKP", city: "Viracopos (Campinas)", uf: "SP" },
-  { code: "SBFI", city: "Foz do Iguaçu", uf: "PR" },
-  { code: "SBJV", city: "Joinville", uf: "SC" },
-  { code: "SBNF", city: "Navegantes", uf: "SC" },
-  { code: "SBRP", city: "Ribeirão Preto", uf: "SP" },
-  { code: "SBRD", city: "Rondonópolis", uf: "MT" },
-  { code: "SBIZ", city: "Imperatriz", uf: "MA" },
-  { code: "SBLO", city: "Londrina", uf: "PR" },
-  { code: "SBCA", city: "Cascavel", uf: "PR" },
-  { code: "SBMA", city: "Marabá", uf: "PA" },
+  { code: "SBFL", city: "Florianópolis", uf: "SC", lat: -27.6702, lon: -48.5525 },
+  { code: "SBGR", city: "Guarulhos (São Paulo)", uf: "SP", lat: -23.4356, lon: -46.4731 },
+  { code: "SBRJ", city: "Santos Dumont (Rio de Janeiro)", uf: "RJ", lat: -22.9105, lon: -43.1631 },
+  { code: "SBBR", city: "Brasília", uf: "DF", lat: -15.8697, lon: -47.9208 },
+  { code: "SBCF", city: "Confins (Belo Horizonte)", uf: "MG", lat: -19.6244, lon: -43.9719 },
+  { code: "SBRB", city: "Rio Branco", uf: "AC", lat: -9.8686, lon: -67.8992 },
+  { code: "SBMO", city: "Maceió", uf: "AL", lat: -9.5108, lon: -35.7917 },
+  { code: "SBMQ", city: "Macapá", uf: "AP", lat: 0.0506, lon: -51.0722 },
+  { code: "SBEG", city: "Manaus", uf: "AM", lat: -3.0386, lon: -60.0497 },
+  { code: "SBSV", city: "Salvador", uf: "BA", lat: -12.9086, lon: -38.3225 },
+  { code: "SBFZ", city: "Fortaleza", uf: "CE", lat: -3.7763, lon: -38.5326 },
+  { code: "SBVT", city: "Vitória", uf: "ES", lat: -20.2581, lon: -40.2864 },
+  { code: "SBGO", city: "Goiânia", uf: "GO", lat: -16.6320, lon: -49.2206 },
+  { code: "SBSL", city: "São Luís", uf: "MA", lat: -2.5853, lon: -44.2342 },
+  { code: "SBCY", city: "Cuiabá", uf: "MT", lat: -15.6529, lon: -56.1167 },
+  { code: "SBCG", city: "Campo Grande", uf: "MS", lat: -20.4687, lon: -54.6725 },
+  { code: "SBBE", city: "Belém", uf: "PA", lat: -1.3792, lon: -48.4763 },
+  { code: "SBJP", city: "João Pessoa", uf: "PB", lat: -7.1459, lon: -34.9486 },
+  { code: "SBCT", city: "Curitiba", uf: "PR", lat: -25.5285, lon: -49.1758 },
+  { code: "SBRF", city: "Recife", uf: "PE", lat: -8.1265, lon: -34.9236 },
+  { code: "SBTE", city: "Teresina", uf: "PI", lat: -5.0599, lon: -42.8237 },
+  { code: "SBGL", city: "Galeão (Rio de Janeiro)", uf: "RJ", lat: -22.8100, lon: -43.2506 },
+  { code: "SBSG", city: "Natal", uf: "RN", lat: -5.7681, lon: -35.3764 },
+  { code: "SBPA", city: "Porto Alegre", uf: "RS", lat: -29.9944, lon: -51.1714 },
+  { code: "SBPV", city: "Porto Velho", uf: "RO", lat: -8.7093, lon: -63.9022 },
+  { code: "SBBV", city: "Boa Vista", uf: "RR", lat: 2.8436, lon: -60.6903 },
+  { code: "SBSP", city: "Congonhas (São Paulo)", uf: "SP", lat: -23.6267, lon: -46.6553 },
+  { code: "SBAR", city: "Aracaju", uf: "SE", lat: -10.9840, lon: -37.0703 },
+  { code: "SBPJ", city: "Palmas", uf: "TO", lat: -10.2915, lon: -48.3572 },
+  { code: "SBKP", city: "Viracopos (Campinas)", uf: "SP", lat: -23.0074, lon: -47.1345 },
+  { code: "SBFI", city: "Foz do Iguaçu", uf: "PR", lat: -25.6001, lon: -54.4854 },
+  { code: "SBJV", city: "Joinville", uf: "SC", lat: -26.2245, lon: -48.7975 },
+  { code: "SBNF", city: "Navegantes", uf: "SC", lat: -26.8797, lon: -48.6514 },
+  { code: "SBRP", city: "Ribeirão Preto", uf: "SP", lat: -21.1364, lon: -47.7742 },
+  { code: "SBRD", city: "Rondonópolis", uf: "MT", lat: -16.4548, lon: -54.7222 },
+  { code: "SBIZ", city: "Imperatriz", uf: "MA", lat: -5.5328, lon: -47.4600 },
+  { code: "SBLO", city: "Londrina", uf: "PR", lat: -23.3336, lon: -51.1301 },
+  { code: "SBCA", city: "Cascavel", uf: "PR", lat: -24.9058, lon: -53.5011 },
+  { code: "SBMA", city: "Marabá", uf: "PA", lat: -5.3684, lon: -49.1381 },
 ];
 
 const TABS = [
@@ -1331,57 +1341,56 @@ function getHistoricMetarData(icao){
   return { ...record.parsed, source: 'historic', hour: record.hour };
 }
 
-async function loadRealSatelite(){
-  if(sateliteLoading || REAL_SATELITE !== undefined) return;
-  sateliteLoading = true;
+// NASA GIBS (Global Imagery Browse Services) — mesma imagem GOES-East/GeoColor usada
+// pelo NASA Worldview, servida em tiles WMTS (z/y/x). Diferente do arquivo único da
+// REDEMET (Brasil inteiro, resolução fixa — dar zoom nele só amplia os mesmos pixels),
+// cada tile do GIBS já nasce na resolução daquele nível de zoom, então dá pra focar
+// num aeroporto sem pixelizar.
+const GIBS_LAYER = 'GOES-East_ABI_GeoColor';
+const GIBS_TILE_MATRIX_SET = 'GoogleMapsCompatible_Level7';
+const GIBS_MAX_NATIVE_ZOOM = 6; // maior TileMatrix com dados reais nesse layer (confirmado no GetCapabilities)
+const GIBS_TILE_URL = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${GIBS_LAYER}/default/default/${GIBS_TILE_MATRIX_SET}/{z}/{y}/{x}.png`;
+// tile de referência (dentro da área de cobertura do layer) usado só pra ler o horário
+// real da imagem no header HTTP — não é exibido. O "default" no lugar do timestamp faz
+// a GIBS sempre servir a granule mais recente disponível.
+const GIBS_PROBE_TILE_URL = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${GIBS_LAYER}/default/default/${GIBS_TILE_MATRIX_SET}/4/6/8.png`;
+
+async function loadGibsSatelite(){
+  if(gibsSateliteLoading || GIBS_SATELITE !== undefined) return;
+  gibsSateliteLoading = true;
   try{
-    // api_key vai na URL (não como header custom) para não disparar preflight CORS,
-    // que a API do DECEA rejeita com 403 API_KEY_MISSING
-    const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=3&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
-    const resp = await fetch(url);
+    const resp = await fetch(GIBS_PROBE_TILE_URL, { method: 'HEAD' });
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    let list = (json && json.data && json.data.satelite) || [];
-    let stale = false;
-    if(list.length === 0){
-      // a REDEMET às vezes fica horas sem publicar imagem nova e, nesse caso, o feed
-      // "ao vivo" (sem parâmetro data) responde vazio mesmo com imagens antigas ainda
-      // existindo — em vez de desistir, procura a última imagem realmente publicada
-      const ultimaConhecida = await findLastAvailableSatelite();
-      if(ultimaConhecida){ list = [ultimaConhecida]; stale = true; }
-    }
-    if(list.length === 0) throw new Error('sem imagens de satélite disponíveis no momento');
-    const ultima = list[list.length - 1];
-    REAL_SATELITE = { path: ultima.path, updated: timeAgo(ultima.data), stale };
+    const actual = resp.headers.get('layer-time-actual');
+    if(!actual) throw new Error('resposta da GIBS sem header layer-time-actual');
+    GIBS_SATELITE = { time: actual };
   }catch(err){
-    console.warn('Falha ao buscar imagem de satélite da REDEMET', err);
-    REAL_SATELITE = null; // marca como "tentou e falhou" -> cai no placeholder ilustrativo
+    console.warn('Falha ao consultar horário da imagem de satélite da NASA GIBS', err);
+    GIBS_SATELITE = null; // marca como "tentou e falhou" -> cai no placeholder ilustrativo
   }finally{
-    sateliteLoading = false;
+    gibsSateliteLoading = false;
     if(currentTab === 'metar' && metarSubTab === 'imagem'){
       render();
     }
   }
 }
 
-// recua no tempo em saltos de 6h (o "cache recente" da REDEMET some quando o feed
-// ao vivo fica sem imagem nova por várias horas, mas o histórico de horas mais
-// antigas continua respondendo normalmente) até achar a última imagem publicada,
-// em vez de simplesmente mostrar "imagem indisponível" pro usuário
-async function findLastAvailableSatelite(){
-  for(let step = 1; step <= 8; step++){
-    try{
-      const url = `${REDEMET_BASE}/produtos/satelite/realcada?anima=3&data=${nowUTCString(-6*step)}&api_key=${encodeURIComponent(REDEMET_API_KEY)}`;
-      const resp = await fetch(url);
-      if(!resp.ok) continue;
-      const json = await resp.json();
-      const list = (json && json.data && json.data.satelite) || [];
-      if(list.length > 0) return list[list.length - 1];
-    }catch(err){
-      // tenta o próximo salto de 6h no passado
-    }
-  }
-  return null;
+// formata um timestamp ISO8601 (ex.: "2026-08-07T01:20:00Z") no mesmo estilo usado
+// pros horários da REDEMET: "há X min" e "HH:MM UTC (HH:MM em Brasília)"
+function gibsTimeAgo(iso){
+  const then = new Date(iso).getTime();
+  if(isNaN(then)) return "agora mesmo";
+  const diffMin = Math.round((Date.now() - then)/60000);
+  if(diffMin < 1) return "agora mesmo";
+  if(diffMin < 60) return `há ${diffMin} min`;
+  return `há ${Math.round(diffMin/60)}h`;
+}
+function gibsTimeLabel(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const hh = pad(d.getUTCHours()), mm = pad(d.getUTCMinutes());
+  const localHour = (d.getUTCHours() + 24 - BRT_OFFSET_HOURS) % 24;
+  return `${hh}:${mm} UTC (${pad(localHour)}:${mm} em Brasília)`;
 }
 
 function getSateliteData(){
@@ -1393,8 +1402,8 @@ function getSateliteData(){
     if(v === null) return { source: 'fallback-historic' };
     return { ...v, source: 'historic' };
   }
-  if(REAL_SATELITE) return { ...REAL_SATELITE, source: REAL_SATELITE.stale ? 'stale' : 'real' };
-  if(REAL_SATELITE === null) return { source: 'fallback' };
+  if(GIBS_SATELITE) return { ...GIBS_SATELITE, source: 'real' };
+  if(GIBS_SATELITE === null) return { source: 'fallback' };
   return { source: 'loading' };
 }
 
@@ -1431,7 +1440,6 @@ function sourceTagHtml(source, apiLabel){
   if(source === 'loading') return `<div class="source-tag"><span class="dot"></span>Carregando dado da ${api}...</div>`;
   if(source === 'fallback') return `<div class="source-tag fallback"><span class="dot"></span>Dado de exemplo — ${api} indisponível no momento</div>`;
   if(source === 'fallback-historic') return `<div class="source-tag fallback"><span class="dot"></span>Imagem indisponível para esse horário</div>`;
-  if(source === 'stale') return `<div class="source-tag fallback"><span class="dot"></span>Última imagem disponível — API-${api} (desatualizada)</div>`;
   return '';
 }
 
@@ -2438,6 +2446,10 @@ function render(){
   if(currentTab !== 'mapa' && mapInstance){
     teardownMap();
   }
+  if(!(currentTab === 'metar' && metarSubTab === 'imagem') && sateliteMapInstance){
+    sateliteMapInstance.remove();
+    sateliteMapInstance = null;
+  }
 
   if(currentTab === 'mapa'){
     renderMapaTab(main);
@@ -2447,7 +2459,7 @@ function render(){
   if(currentTab === 'metar'){
     if(metarMode === 'live'){
       if(REAL_METAR[currentCode] === undefined) loadRealMetar(currentCode);
-      if(metarSubTab === 'imagem' && REAL_SATELITE === undefined) loadRealSatelite();
+      if(metarSubTab === 'imagem' && GIBS_SATELITE === undefined) loadGibsSatelite();
     } else if(metarMode === 'historic' && historicDate){
       const mKey = `${currentCode}_${historicDate}`;
       if(HISTORIC_METAR[mKey] === undefined) loadHistoricMetar(currentCode, historicDate);
@@ -2730,27 +2742,43 @@ function renderMetarImagem(metarData){
   const content = document.getElementById('metarSubContent');
   const sat = getSateliteData();
   const level = (metarData && metarData.level) ? metarData.level : 'low';
-  const hasImage = sat.source === 'real' || sat.source === 'historic' || sat.source === 'stale';
+  const airport = AIRPORTS.find(a => a.code === currentCode);
+  const isLive = metarMode === 'live';
+  const showMap = isLive && sat.source === 'real' && airport;
+  const hasStaticImage = !isLive && sat.source === 'historic';
 
-  const frame = hasImage
-    ? `<img src="${sat.path}" alt="Imagem de satélite REDEMET" style="width:100%; height:auto; display:block; border-radius:8px;">`
-    : svgSatellite(level);
+  // o mini-mapa Leaflet vive dentro do innerHTML abaixo, que é recriado a cada
+  // render — sempre desmonta a instância anterior antes de trocar o conteúdo, senão
+  // o Leaflet fica preso a um nó de DOM que já foi substituído
+  if(sateliteMapInstance){
+    sateliteMapInstance.remove();
+    sateliteMapInstance = null;
+  }
+
+  const frame = showMap
+    ? `<div class="map-wrap sat-mini" id="satMapWrap"><div id="satMap" style="width:100%; height:100%;"></div></div>`
+    : hasStaticImage
+      ? `<img src="${sat.path}" alt="Imagem de satélite REDEMET" style="width:100%; height:auto; display:block; border-radius:8px;">`
+      : svgSatellite(level);
 
   let caption;
-  if(sat.source === 'real') caption = `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA · atualizada ${sat.updated}.`;
+  if(sat.source === 'real') caption = `Imagem de satélite real (GeoColor), fornecida pela NASA GIBS (satélite GOES-East) · imagem das ${gibsTimeLabel(sat.time)}, atualizada ${gibsTimeAgo(sat.time)}.`;
   else if(sat.source === 'historic') caption = `Imagem de satélite real (infravermelho realçado) de <b>${sat.updated}</b>, fornecida pela API-REDEMET/DECEA.`;
-  else if(sat.source === 'stale') caption = `Imagem de satélite real (infravermelho realçado), fornecida pela API-REDEMET/DECEA — <b>desatualizada, ${sat.updated}</b> (a REDEMET ainda não publicou uma imagem mais recente).`;
-  else if(sat.source === 'loading') caption = 'Carregando imagem de satélite da REDEMET...';
+  else if(sat.source === 'loading') caption = isLive ? 'Consultando horário da imagem de satélite (NASA GIBS)...' : 'Carregando imagem de satélite da REDEMET...';
   else if(sat.source === 'idle') caption = 'Escolha uma data e um horário acima para ver a imagem de satélite daquele momento.';
   else if(sat.source === 'fallback-historic') caption = 'Ilustração de exemplo — não há imagem de satélite registrada para esse horário exato.';
-  else caption = 'Ilustração de exemplo — não foi possível carregar a imagem real da REDEMET no momento.';
+  else caption = isLive
+    ? 'Ilustração de exemplo — não foi possível carregar a imagem real da NASA GIBS no momento.'
+    : 'Ilustração de exemplo — não foi possível carregar a imagem real da REDEMET no momento.';
 
   const tagSource = sat.source === 'idle' ? '' : (sat.source === 'fallback-historic' ? 'fallback' : sat.source);
+  const tagApiLabel = isLive ? 'NASA GIBS' : 'REDEMET';
   const hasMetarFields = metarData && metarData.raw;
+  const label = showMap ? `Imagem de satélite · região de ${airport.code}` : 'Imagem de satélite · Brasil';
 
   content.innerHTML = `
-    <div class="section-label">Imagem de satélite · Brasil</div>
-    ${sourceTagHtml(tagSource)}
+    <div class="section-label">${label}</div>
+    ${sourceTagHtml(tagSource, tagApiLabel)}
     <div class="image-frame">${frame}</div>
     <div class="image-caption">${caption}</div>
     ${hasMetarFields ? `
@@ -2774,6 +2802,33 @@ function renderMetarImagem(metarData){
       <div class="raw-box show" style="margin-bottom:16px;">${metarData.raw}</div>
     ` : ''}
   `;
+
+  if(showMap){
+    sateliteMapInstance = L.map('satMap', {
+      center: [airport.lat, airport.lon],
+      zoom: 7,
+      minZoom: 3,
+      maxZoom: 9,
+      attributionControl: true,
+      fadeAnimation: false, // sem isso os tiles às vezes ficam presos em opacity:0
+    });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(sateliteMapInstance);
+    L.tileLayer(GIBS_TILE_URL, {
+      attribution: 'Satélite: NASA GIBS (GOES-East GeoColor)',
+      maxZoom: 9,
+      maxNativeZoom: GIBS_MAX_NATIVE_ZOOM,
+      tileSize: 256,
+      noWrap: true,
+      opacity: 0.92,
+    }).addTo(sateliteMapInstance);
+    L.circleMarker([airport.lat, airport.lon], {
+      radius: 5, color: '#F2A93B', weight: 2, fillColor: '#F2A93B', fillOpacity: 0.9,
+    }).addTo(sateliteMapInstance).bindTooltip(airport.code);
+  }
 }
 
 function renderRotaer(data){
@@ -2892,8 +2947,8 @@ function refreshAllRealData(){
   // o que está sendo exibido agora — evita bater na API à toa pros outros
   REAL_METAR[currentCode] = undefined;
   loadRealMetar(currentCode);
-  REAL_SATELITE = undefined;
-  loadRealSatelite();
+  GIBS_SATELITE = undefined;
+  loadGibsSatelite();
 }
 
 setInterval(refreshAllRealData, AUTO_REFRESH_MS);
