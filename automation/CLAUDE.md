@@ -1,0 +1,210 @@
+# Automação @avisoaereo — padrão de design dos posts
+
+Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
+`content.py`, `backgrounds.py`) devem perseguir. Toda vez que este projeto for
+retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
+continue subindo em direção a essa referência, em vez de recomeçar do zero.
+
+## Referência de estilo: feed do G1 no Instagram
+
+O padrão escolhido (aprovado pelo usuário em 2026-08-23) é inspirado no card
+de notícia do G1 no Instagram:
+
+- **Foto real de fundo**, ocupando o slide inteiro (não ilustração/ícone,
+  quando há alternativa real disponível) — é o que dá credibilidade: "as
+  pessoas acreditam mais no post quando vêem coisas que reconhecem do dia a
+  dia" (aeroporto da própria cidade, não um desenho genérico).
+- **Degradê escuro na base** da foto (não mais um bloco preto sólido) —
+  garante legibilidade do título sem esconder a foto.
+- **Selo pequeno da conta** (`@avisoaereo`) discreto, canto superior esquerdo.
+- **Etiqueta colorida curta (kicker)** acima do título — hoje mostra
+  `ICAO · UF` (informação nova, já que o título repete cidade/categoria). A
+  cor da etiqueta segue a severidade (vermelho = alto impacto, âmbar =
+  atenção).
+- **Título em frase normal** (só a primeira letra maiúscula), não em CAIXA
+  ALTA — bold, branco, 2-3 linhas.
+- Quando a foto de fundo exige crédito (licença CC-BY/CC-BY-SA), uma linha
+  pequena "Foto: {autor}" aparece no rodapé do slide.
+
+O slide EXPLICATIVO (fundo branco, texto corrido serifado) não segue esse
+padrão fotográfico; ele é o card de "aprofundamento".
+
+**Regra fixa (2026-08-23): todo post é carrossel, sempre com no mínimo 2
+slides** — capa (mensagem principal + palavras-chave) e explicativo (o que
+aconteceu / o que significa / duração). `needs_explicativo` em
+`build_post_content` (content.py) é sempre `True` — não voltar a deixar
+condicional. Se algum dia fizer sentido um carrossel com mais de 2 slides
+(ex.: capas adicionais pra informação que não cabe em uma), pode crescer,
+nunca encolher pra 1 slide.
+
+## Regra fixa: sempre explicar o impacto prático (aprovado 2026-08-23)
+
+Todo post precisa deixar claro **o que aquilo significa na prática pra vida de
+quem viaja** — não basta o fato técnico ("VOR/DME fora de serviço"), tem que
+dar pra uma pessoa sem nenhum conhecimento de aviação entender se isso é
+"posso ter meu voo atrasado" ou "não afeta em nada o passageiro comum". Essa
+explicação (`_IMPACT_TEXT` em `content.py`, uma por `headline_kind`) tem que
+aparecer em pelo menos um destes dois lugares — os dois é ainda melhor:
+- **na legenda do post** (já é automático — ver `caption_lines` em
+  `build_post_content`, linha "O que isso significa na prática: ...");
+- **em um slide extra no carrossel** (o EXPLICATIVO já carrega esse texto no
+  bloco "O QUE ISSO SIGNIFICA:" quando é gerado).
+
+Nunca publicar um post só com o fato técnico cru, sem essa camada de
+explicação em linguagem simples.
+
+### Pendente pra próxima revisão do texto (feedback 2026-08-23, ainda não aplicado)
+
+O usuário testou o carrossel de Salvador e gostou, mas pediu mais ênfase em
+**VOOS** especificamente no texto de `_IMPACT_TEXT` (content.py). Hoje o texto
+de `rwy_closed` diz algo como "há chance real de atraso, reprogramação ou
+desvio" — genérico demais. O pedido é deixar explícito que é o **voo do
+passageiro** que atrasa/desvia, e detalhar o que "desvio" significa na
+prática (pousar em **pista diferente** ou **aeroporto diferente** do
+planejado) — não é uma correção urgente, é uma revisão de texto pra próxima
+vez que alguém mexer em `_IMPACT_TEXT`. Reescrever os textos de
+`_IMPACT_TEXT` (todos os headline_kind, não só rwy_closed) nessa linha mais
+enfática sobre voos antes de considerar essa regra "fechada".
+
+### Pendente: título de capa deve conter "AEROPORTO" e a consequência (feedback 2026-08-23, ainda não aplicado)
+
+Hoje o `cover_title` (content.py, ver `build_post_content`) segue o formato
+"{categoria} em {cidade}" — ex.: "Pista fechada em Salvador por manutenção".
+O usuário apontou que **"aeroporto" é uma palavra-chave importante** que está
+faltando, e que o título ficaria muito mais informativo e chamativo se já
+citasse a consequência prática direto no título, não só no slide/legenda.
+Exemplo dado por ele: "Aeroporto de Salvador tem pista fechada e pode haver
+cancelamentos e atrasos". Reescrever `cover_title` nessa linha — liderando
+com "Aeroporto de {cidade}" e encerrando com uma consequência concreta
+(atrasos/cancelamentos/desvios) — é a próxima revisão de texto pendente,
+junto com a de `_IMPACT_TEXT` acima (as duas apontam pro mesmo objetivo: ser
+mais explícito sobre o impacto no voo do passageiro). Não aplicar sem o
+usuário pedir explicitamente — por ora é só a diretriz registrada.
+
+## Biblioteca de fotos reais por aeroporto
+
+- `assets/photos/<ICAO>.jpg` — foto curada do aeroporto, sem nenhum
+  tratamento de cor (usada em cor natural, ao contrário do satélite/
+  ilustração, que levam duotone vermelho).
+- `assets/photos/manifest.json` — um registro por ICAO com `source_page`,
+  `source_file`, `author`, `license`, `date_taken`. Sempre preencher ao
+  adicionar uma foto nova.
+- Prioridade de fundo (`backgrounds.get_background_for_post`):
+  1. foto curada do aeroporto (se existir em `assets/photos/`)
+  2. imagem de satélite real da REDEMET, só pra avisos de origem
+     meteorológica (visibilidade, vento, trovoada etc.)
+  3. ilustração geométrica simples desenhada por código (pista/torre/antena),
+     último recurso quando não há foto curada e o motivo é operacional
+     (pista/torre/aux. navegação)
+
+Status atual (2026-08-23): **11 de 30 aeroportos têm foto curada** — SBEG
+(Manaus), SBGR (Guarulhos), SBSP (Congonhas), SBCF (Confins/BH), SBRJ (Santos
+Dumont), SBGL (Galeão), SBBR (Brasília), SBPA (Porto Alegre), SBBE (Belém),
+SBSV (Salvador), SBCY (Cuiabá). Faltam 19: SBFL, SBMO, SBMQ, SBFZ, SBVT, SBGO,
+SBSL, SBCG, SBJP, SBCT, SBTE, SBSG, SBPV, SBBV, SBAR, SBPJ, SBKP, SBRB, SBRF.
+Ir preenchendo os outros ao longo do tempo é o principal jeito de "melhorar o
+post" — quanto mais aeroportos tiverem foto real, menos posts caem no
+fallback genérico/ilustração. Busca ampliada além do Wikimedia Commons quando
+fizer sentido (o usuário pediu explicitamente pra não restringir a fontes só
+brasileiras) — mas o Commons continua sendo a fonte mais confiável pra achar
+fotos com licença livre e verificável.
+
+Biblioteca genérica (`assets/photos/generic/<categoria>/`, ver seção abaixo):
+`aircraft` e `terminal` já têm 1 foto cada; `queue` (fila de check-in com
+pessoas) ainda está vazia — não achei rapidamente uma foto brasileira boa,
+livre de direitos e sem logo de companhia extinta. Prioridade pra próxima
+sessão de curadoria.
+
+### Critério pra escolher uma foto nova
+
+Buscar na internet como um todo (inclusive sites de notícia), com fallback pro
+Wikimedia Commons se nada bom for encontrado. Ao escolher, evitar:
+- fotos com **logo de companhia aérea desatualizado/extinto** em destaque
+  (ex.: TAM, Varig — empresas que não existem mais);
+- fotos claramente datadas (obras temporárias, aeronaves de décadas atrás);
+- marca d'água de banco de imagens ou crédito de fotógrafo sobreposto à
+  própria foto (diferente de placas/letreiros do próprio aeroporto, que são
+  parte real do lugar e podem ficar).
+
+Sempre registrar o crédito/licença no manifest — mesmo quando a licença não
+exige atribuição, é bom hábito manter o registro de onde a foto veio.
+
+### Variedade de foto por tipo de aviso (aprovado 2026-08-23)
+
+Não é só fachada de aeroporto — o usuário pediu variedade, buscando o tipo de
+foto mais pertinente ao que o aviso está dizendo:
+
+- **Fachada/torre do aeroporto específico** (o que já temos pra SBEG) — bom
+  padrão geral, principalmente pra auxílio de navegação e avisos meteorológicos.
+- **Saguão/terminal por dentro, com pessoas de verdade circulando** — reforça
+  a identificação ("cada um que já esteve num aeroporto reconhece aquilo").
+- **Aeronave em pista/pátio, de qualquer companhia** (sem viés de marca — não
+  precisa ser da companhia que o passageiro usa) — boa opção genérica quando
+  não há foto específica do aeroporto.
+- **Fila em guichê de check-in/balcão** — a mais pertinente especificamente
+  pra avisos que tendem a gerar atraso/cancelamento (pista fechada, torre
+  fechada) — reforça visualmente a consequência prática do aviso.
+
+Essas três últimas categorias não precisam ser do aeroporto específico (fotos
+genéricas servem, guardadas por categoria, não por ICAO) — usar como camada
+intermediária de fallback: quando não há foto curada do aeroporto em questão,
+prefira uma foto genérica da categoria mais pertinente ao `headline_kind` (fila
+pra pista/torre fechada, aeronave pra clima/aux. navegação, saguão como
+alternativa geral) antes de cair no satélite/ilustração.
+
+## Arquivos do pipeline de design (etapa 3)
+
+- `content.py` — traduz o resultado da etapa 2 (rules.py) em português
+  natural: título de capa, kicker, texto do slide explicativo, legenda do
+  Instagram.
+- `backgrounds.py` — fundo do slide CAPA (foto curada / satélite / ilustração
+  + duotone).
+- `slide.py` — desenho dos slides (CAPA e EXPLICATIVO) com Pillow.
+
+## Etapa 4 (publicação)
+
+Dois modos, pra dois momentos diferentes:
+
+- **Manual/teste** (`publish.py`): fluxo em dois passos — `--stage` (monta,
+  hospeda no GitHub, cria o container) e depois `--go <creation_id>` (publica
+  de fato). Use isso quando quiser testar/revisar um post específico à mão.
+- **Automático** (`run_cycle.py` + `.github/workflows/post-avisos.yml`):
+  publicação sem pausa manual, decidido pelo usuário em 2026-08-23 ("não
+  quero ter que autorizar isso"). Roda sozinho no GitHub Actions, de hora em
+  hora. Ver detalhes na seção seguinte.
+
+### Automação total (regra fixa, decidido 2026-08-23)
+
+- **Onde roda**: GitHub Actions (nuvem), não depende do PC do usuário ligado.
+  Workflow em `.github/workflows/post-avisos.yml`, cron `'0 * * * *'` (de
+  hora em hora) + `workflow_dispatch` pra rodar manualmente pela aba Actions.
+- **Deduplicação** (`state.py`, `state/posted.json`, comitado de volta no
+  repo a cada execução): cada post tem um `dedup_key` (`PostContent.dedup_key`
+  em content.py) — pra NOTAM é o id do próprio NOTAM (não repete enquanto o
+  mesmo NOTAM segue em vigor, por mais dias que dure); pra clima é
+  `icao|weather|kind|data-de-hoje-em-Brasília` (uma condição de tempo que
+  continua no dia seguinte conta como "nova" — atualização diária, não
+  repetição a cada hora). **Sem isso, um NOTAM de dias viraria post repetido
+  a cada execução.**
+- **Limite de ritmo** (`run_cycle.py`, `MAX_POSTS_PER_RUN = 3`): no máximo 3
+  posts NOVOS por execução, mesmo que mais aeroportos tenham virado condição
+  nova ao mesmo tempo (ex.: frente fria afetando vários aeroportos numa
+  mesma hora) — o resto sai nas próximas execuções, nunca se perde. Existe
+  pra não parecer comportamento de bot/spam pra Meta (a API do Instagram tem
+  um teto de ~25 posts/24h por conta, e rajadas de posts parecidos em pouco
+  tempo são o tipo de padrão que sistemas antispam costumam sinalizar).
+- **Lançamento** (2026-08-23): o registro (`state/posted.json`) foi
+  "primado" com todas as condições ativas no dia do lançamento — incluindo os
+  2 posts de teste manuais já publicados (Manaus/SBEG, Salvador/SBSV, com o
+  media_id real) e as demais ~15 condições já ativas na época, marcadas como
+  vistas sem post real (`media_id: "skipped_at_launch_no_post"`) — pra
+  automação começar reagindo só a coisas NOVAS a partir do lançamento, sem
+  rajada inicial. Isso foi uma escolha pontual do lançamento, não repetir
+  esse "priming" depois — a partir daqui o registro só cresce organicamente.
+
+### Segredos necessários no GitHub (Settings → Secrets and variables → Actions)
+
+`INSTAGRAM_TOKEN`, `REDEMET_API_KEY`, `AISWEB_API_KEY`, `AISWEB_API_PASS` —
+os mesmos valores do `.env` local. Configuração manual (não há `gh` CLI
+instalado nesta máquina pra automatizar isso); ver instruções que o
+assistente passou ao usuário em 2026-08-23.

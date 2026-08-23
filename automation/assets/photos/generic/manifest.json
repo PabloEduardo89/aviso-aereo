@@ -1,0 +1,20 @@
+{
+  "aircraft/01_gol_congonhas.jpg": {
+    "description": "Aeronave da GOL Linhas Aéreas em solo, Aeroporto de Congonhas — skyline de São Paulo ao fundo",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeronave_da_Gol_Linhas_A%C3%A9reas_em_S%C3%A3o_Paulo,_Aeroporto_de_Congonhas.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/1/12/Aeronave_da_Gol_Linhas_A%C3%A9reas_em_S%C3%A3o_Paulo%2C_Aeroporto_de_Congonhas.jpg",
+    "author": "Peão de estância",
+    "license": "CC BY-SA 3.0",
+    "date_taken": "2010-09-11",
+    "attribution_required": true
+  },
+  "terminal/01_natal_saguao.jpg": {
+    "description": "Saguão/área de check-in do Aeroporto de Natal (Augusto Severo)",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Sagu%C3%A3o_do_Aeroporto_de_Natal.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/7/7d/Sagu%C3%A3o_do_Aeroporto_de_Natal.jpg",
+    "author": "Jorge Andrade",
+    "license": "CC BY 2.0",
+    "date_taken": "2010-11-14",
+    "attribution_required": true
+  }
+}

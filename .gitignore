@@ -10,3 +10,9 @@ credentials*.json
 # opensky-proxy (Vercel Functions)
 node_modules/
 .vercel/
+
+# automation — saída gerada localmente (não faz parte do post publicado,
+# que vai pra posts/<ICAO>/ via publish.py/run_cycle.py)
+automation/output/
+automation/__pycache__/
+automation/**/__pycache__/

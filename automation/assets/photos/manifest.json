@@ -1,0 +1,112 @@
+{
+  "SBEG": {
+    "airport": "Aeroporto Internacional de Manaus — Eduardo Gomes",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Manaus_airport.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Manaus_airport.jpg",
+    "author": "Arne Müseler / www.arne-mueseler.com",
+    "license": "CC BY-SA 3.0 DE",
+    "date_taken": "2022-02-21",
+    "attribution_required": true,
+    "notes": "Fachada principal, foto atual (2022), sem logos de companhias aéreas."
+  },
+  "SBGR": {
+    "airport": "Aeroporto Internacional de Guarulhos — Governador André Franco Montoro",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Torre_de_Controle_do_Aeroporto_Internacional_de_Guarulhos.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/7/7f/Torre_de_Controle_do_Aeroporto_Internacional_de_Guarulhos.jpg",
+    "author": "Alexandro Dias",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2024-05-25",
+    "attribution_required": true,
+    "notes": "Torre de controle, ângulo icônico, foto recente (2024)."
+  },
+  "SBSP": {
+    "airport": "Aeroporto de Congonhas — São Paulo",
+    "source_page": "https://commons.wikimedia.org/wiki/File:%C3%81rea_de_embarque_do_Aeroporto_de_Congonhas,_S%C3%A3o_Paulo,_agosto_de_2018.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/7/79/%C3%81rea_de_embarque_do_Aeroporto_de_Congonhas%2C_S%C3%A3o_Paulo%2C_agosto_de_2018.jpg",
+    "author": "Fronteira (Wikimedia Commons)",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2018-08-01",
+    "attribution_required": true,
+    "notes": "Saguão de embarque com passageiros reais circulando — bom exemplo do padrão 'saguão com pessoas' pedido pelo usuário."
+  },
+  "SBCF": {
+    "airport": "Aeroporto Internacional de Belo Horizonte — Confins (Tancredo Neves)",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Internacional_de_BH_02.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/f/f9/Aeroporto_Internacional_de_BH_02.jpg",
+    "author": "Túllio F",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2025-07-13",
+    "attribution_required": true,
+    "notes": "Fachada do desembarque 2, foto bem recente (2025), sinalização clara."
+  },
+  "SBRJ": {
+    "airport": "Aeroporto Santos Dumont — Rio de Janeiro",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Santos_Dumont_from_Rio_de_Janeiro,_Brazil.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/c/c1/Aeroporto_Santos_Dumont_from_Rio_de_Janeiro%2C_Brazil.jpg",
+    "author": "Wilfredor",
+    "license": "CC0 1.0 (domínio público — atribuição não exigida, mas registrada por boa prática)",
+    "date_taken": "2024-06-22",
+    "attribution_required": false,
+    "notes": "Vista aérea da pista adentrando a Baía de Guanabara, com o Palácio da Ilha Fiscal ao fundo — extremamente reconhecível."
+  },
+  "SBGL": {
+    "airport": "Aeroporto Internacional do Rio de Janeiro — Galeão (Tom Jobim)",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Gale%C3%A3o_by_Diego_Baravelli.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/f/fb/Gale%C3%A3o_by_Diego_Baravelli.jpg",
+    "author": "Diego Baravelli",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2017-06-27",
+    "attribution_required": true,
+    "notes": "Vista aérea do pátio internacional (Air France, Lufthansa etc.). Uma aeronave da Alitalia (extinta em 2021) aparece ao fundo, não em destaque."
+  },
+  "SBBR": {
+    "airport": "Aeroporto Internacional de Brasília — Presidente Juscelino Kubitschek",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Brasilia_airport_terminal.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/a/a6/Brasilia_airport_terminal.jpg",
+    "author": "Arne Müseler / www.arne-mueseler.com",
+    "license": "CC BY-SA 3.0 DE",
+    "date_taken": "2022-02-17",
+    "attribution_required": true,
+    "notes": "Interior do terminal, estrutura de teto moderna e reconhecível, com pessoas reais."
+  },
+  "SBPA": {
+    "airport": "Aeroporto Internacional Salgado Filho — Porto Alegre",
+    "source_page": "https://pt.wikipedia.org/wiki/Ficheiro:Aeroporto_Salgado_Filho_de_Porto_Alegre,_janeiro_de_2025.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Aeroporto_Salgado_Filho_de_Porto_Alegre%2C_janeiro_de_2025.jpg",
+    "author": "Yeuxpapilon",
+    "license": "CC BY 4.0",
+    "date_taken": "2025-01-27",
+    "attribution_required": true,
+    "notes": "Fachada com letreiro 'Porto Alegre Airport' visível, aeronaves GOL/LATAM em pátio."
+  },
+  "SBBE": {
+    "airport": "Aeroporto Internacional de Belém — Val de Cans/Júlio Cezar Ribeiro",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Bel%C3%A9m_International_Airport,_2018_(1).jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Bel%C3%A9m_International_Airport%2C_2018_%281%29.jpg",
+    "author": "Jcornelius (Cornelius Kibelka)",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2018-08-27",
+    "attribution_required": true,
+    "notes": "Fachada com cobertura de concreto em balanço, arquitetura marcante."
+  },
+  "SBSV": {
+    "airport": "Aeroporto Internacional de Salvador — Deputado Luís Eduardo Magalhães",
+    "source_page": "https://commons.wikimedia.org/wiki/File:At_Salvador,_Bahia_2025_203.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/9/9b/At_Salvador%2C_Bahia_2025_203.jpg",
+    "author": "Mike Peel (www.mikepeel.net)",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2025-07-16",
+    "attribution_required": true,
+    "notes": "Sala de embarque cheia de passageiros reais, sinalização 'SALVADOR DUTY FREE' visível — ótimo exemplo do padrão 'saguão/fila com pessoas' pedido pelo usuário."
+  },
+  "SBCY": {
+    "airport": "Aeroporto Internacional de Cuiabá — Marechal Rondon",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Internacional_de_Cuiab%C3%A1_-_Marechal_Rondon_04.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/9/97/Aeroporto_Internacional_de_Cuiab%C3%A1_-_Marechal_Rondon_04.jpg",
+    "author": "Túllio F",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2024-08-23",
+    "attribution_required": true,
+    "notes": "Fachada ao entardecer, nome do aeroporto bem legível, pessoas reais circulando."
+  }
+}

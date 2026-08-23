@@ -1,0 +1,44 @@
+name: Publicar avisos aéreos
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # a cada hora, no minuto 0 (UTC)
+  workflow_dispatch: {}     # permite rodar manualmente pela aba Actions do GitHub
+
+permissions:
+  contents: write   # precisa pra comitar as imagens/estado de volta no repo
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: pip install -r automation/requirements.txt
+
+      - name: Configurar identidade do git (pra comitar imagens/estado)
+        run: |
+          git config user.name "avisoaereo-bot"
+          git config user.email "actions@users.noreply.github.com"
+
+      - name: Rodar ciclo de publicação
+        working-directory: automation
+        env:
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          REDEMET_API_KEY: ${{ secrets.REDEMET_API_KEY }}
+          AISWEB_API_KEY: ${{ secrets.AISWEB_API_KEY }}
+          AISWEB_API_PASS: ${{ secrets.AISWEB_API_PASS }}
+        run: python run_cycle.py
+
+      - name: Comitar estado atualizado (posted.json)
+        run: |
+          git add automation/state/posted.json
+          git diff --cached --quiet || git commit -m "state: atualiza registro de posts [skip ci]"
+          git push
