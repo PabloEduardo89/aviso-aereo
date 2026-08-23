@@ -228,5 +228,55 @@
     "date_taken": "2011-04-07",
     "attribution_required": true,
     "notes": "Foto de 2011, mas nome 'TERESINA' e torre bem visíveis, sem elementos datados problemáticos."
+  },
+  "SBMO": {
+    "airport": "Aeroporto Internacional Zumbi dos Palmares — Maceió",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Internacional_de_Macei%C3%B3-Zumbi_dos_Palmares.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/3/38/Aeroporto_Internacional_de_Macei%C3%B3-Zumbi_dos_Palmares.jpg",
+    "author": "Palmeira",
+    "license": "CC BY 3.0",
+    "date_taken": "2007-08-04",
+    "attribution_required": true,
+    "notes": "Resolução baixa (800x576) mas nome do aeroporto enorme e nítido; terminal inaugurado em 2005, prédio não deve ter mudado."
+  },
+  "SBSL": {
+    "airport": "Aeroporto Internacional de São Luís — Marechal Cunha Machado",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Terminal_do_Aeroporto_Cunha_Machado.JPG",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/c/cf/Terminal_do_Aeroporto_Cunha_Machado.JPG",
+    "author": "Marcus Soares (SLRTDM)",
+    "license": "CC BY-SA 3.0",
+    "date_taken": "2014-01-08",
+    "attribution_required": true,
+    "notes": "Cobertura suspensa por cabos, arquitetura marcante; sem nome visível na foto."
+  },
+  "SBPV": {
+    "airport": "Aeroporto Internacional de Porto Velho — Governador Jorge Teixeira",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Internacional_de_Porto_Velho_1.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/4/4f/Aeroporto_Internacional_de_Porto_Velho_1.jpg",
+    "author": "Guilmann",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2017-01-09",
+    "attribution_required": true,
+    "notes": "Foto panorâmica muito larga — recortada manualmente (crop 700-1700px) pra manter o nome 'PORTO VELHO' visível na fachada. Aeronave da Azul (companhia ativa) em pátio."
+  },
+  "SBBV": {
+    "airport": "Aeroporto Internacional de Boa Vista — Atlas Brasil Cantanhede",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Entrada_do_Aeroporto_Internacional_de_Boa_Vista_-_Atlas_Brasil_Cantanhede,_Boa_Vista_RR.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Entrada_do_Aeroporto_Internacional_de_Boa_Vista_-_Atlas_Brasil_Cantanhede%2C_Boa_Vista_RR.jpg",
+    "author": "Jorge Andrade",
+    "license": "CC BY 2.0",
+    "date_taken": "2011-05-09",
+    "attribution_required": true,
+    "notes": "Nome do aeroporto enorme e muito legível, torre de controle ao fundo."
+  },
+  "SBRB": {
+    "airport": "Aeroporto Internacional de Rio Branco — Plácido de Castro",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Riobranco_aeroporto.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/2/28/Riobranco_aeroporto.jpg",
+    "author": "Filipux / Lumijaguaari",
+    "license": "CC BY-SA 3.0 / GFDL",
+    "date_taken": "2006-07-18",
+    "attribution_required": true,
+    "notes": "Foto noturna, nome do aeroporto iluminado e bem legível, pessoas reais na entrada."
   }
 }

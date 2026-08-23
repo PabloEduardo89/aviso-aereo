@@ -97,17 +97,22 @@ usuário pedir explicitamente — por ora é só a diretriz registrada.
      último recurso quando não há foto curada e o motivo é operacional
      (pista/torre/aux. navegação)
 
-Status atual (2026-08-23): **23 de 30 aeroportos têm foto curada** — SBEG
+Status atual (2026-08-23): **28 de 30 aeroportos têm foto curada** — SBEG
 (Manaus), SBGR (Guarulhos), SBSP (Congonhas), SBCF (Confins/BH), SBRJ (Santos
 Dumont), SBGL (Galeão), SBBR (Brasília), SBPA (Porto Alegre), SBBE (Belém),
 SBSV (Salvador), SBCY (Cuiabá), SBFL (Florianópolis), SBGO (Goiânia), SBVT
 (Vitória), SBRF (Recife), SBFZ (Fortaleza), SBCG (Campo Grande), SBJP (João
 Pessoa), SBSG (Natal — atenção: é o Aeroporto Aluízio Alves/São Gonçalo do
 Amarante, NÃO o antigo Augusto Severo, desativado p/ civil em 2014), SBAR
-(Aracaju), SBKP (Viracopos/Campinas), SBPJ (Palmas), SBTE (Teresina).
-Faltam 7: SBMO (Maceió), SBMQ (Macapá), SBSL (São Luís), SBCT (Curitiba —
-tentado 2x, só achei foto de 2006, pulado), SBPV (Porto Velho), SBBV (Boa
-Vista), SBRB (Rio Branco).
+(Aracaju), SBKP (Viracopos/Campinas), SBPJ (Palmas), SBTE (Teresina), SBMO
+(Maceió), SBSL (São Luís), SBPV (Porto Velho), SBBV (Boa Vista), SBRB (Rio
+Branco).
+Faltam só 2: **SBMQ (Macapá)** — o terminal antigo foi demolido/substituído
+em 2019 e só achei fotos do prédio antigo, que não existe mais, então pulei
+de propósito (evitar mostrar um lugar que não é mais real); **SBCT
+(Curitiba)** — tentado 3x, as únicas fotos encontradas são de 2006-2009 ou
+distantes/pouco reconhecíveis. Ambos precisam de uma nova tentativa de busca
+mais pra frente (talvez fontes além do Wikimedia Commons).
 Ir preenchendo os outros ao longo do tempo é o principal jeito de "melhorar o
 post" — quanto mais aeroportos tiverem foto real, menos posts caem no
 fallback genérico/ilustração. Busca ampliada além do Wikimedia Commons quando
