@@ -257,88 +257,87 @@ def metar_local_time_short(metar: MetarResult) -> str:
 
 
 def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
-                        evaluation: AirportEvaluation) -> PostContent | None:
-    """Monta o conteúdo do post a partir do resultado já filtrado pela etapa 2.
-    Retorna None se não houver o que postar (should_post=False)."""
+                        evaluation: AirportEvaluation) -> list:
+    """Monta o(s) post(s) a partir do resultado já filtrado pela etapa 2 — um
+    aeroporto pode gerar MAIS DE UM post ao mesmo tempo quando há motivos
+    distintos e não relacionados (ex.: uma pista fechada e, à parte, uma
+    trovoada) — cada notícia relevante tem seu próprio card, em vez de
+    misturar tudo num post só (decisão do usuário, 2026-08-23). Retorna lista
+    vazia se não houver o que postar (should_post=False)."""
     if not evaluation.should_post:
-        return None
+        return []
 
-    bullets = []
-    kinds_present = []
-    source_by_kind = {}  # kind -> MetarFields (motivo METAR) ou NotamHit (motivo NOTAM)
-    fields = None
+    posts = []
 
+    # --- post do clima: todos os motivos de METAR do momento juntos (é UMA
+    # situação meteorológica só, não notícias separadas) ---
     if evaluation.metar_reasons:
         fields = parse_metar(metar.raw)
-        for reason in evaluation.metar_reasons:
-            bullets.append(_metar_sentence(reason.kind, fields))
-            kinds_present.append(reason.kind)
-            source_by_kind[reason.kind] = fields
+        kinds = [r.kind for r in evaluation.metar_reasons]
+        bullets = [_metar_sentence(k, fields) for k in kinds]
+        hoje = (datetime.now(timezone.utc) + BRT_OFFSET).strftime("%Y-%m-%d")
+        headline_kind = next(k for k in _HEADLINE_PRIORITY if k in kinds)
+        dedup_key = f"{icao}|weather|{headline_kind}|{hoje}"
+        posts.append(_build_one_post(
+            icao, airport, metar, bullets, headline_kind, dedup_key,
+            causa=_causa_clause(headline_kind, fields, None),
+            cover_subtitle=f"Atualizado {metar_local_time_short(metar)}" if metar else None,
+            duracao_prevista="Reavaliado a cada novo boletim METAR (de hora em hora)",
+            raw_snippet=metar.raw,
+        ))
 
+    # --- um post por NOTAM relevante: cada NOTAM é a sua própria notícia,
+    # mesmo que aconteça no mesmo aeroporto e no mesmo momento que outra ---
     for hit in evaluation.notam_hits:
-        for reason in hit.reasons:
-            sentence = _notam_sentence(reason.kind, hit.notam)
+        if not hit.reasons:
+            continue
+        kinds = [r.kind for r in hit.reasons]
+        bullets = []
+        for k in kinds:
+            sentence = _notam_sentence(k, hit.notam)
             validity = _format_notam_validity(hit.notam)
-            if validity and reason.kind in ("rwy_closed", "twr_closed"):
+            if validity and k in ("rwy_closed", "twr_closed"):
                 sentence += f" ({validity})"
             bullets.append(sentence)
-            kinds_present.append(reason.kind)
-            source_by_kind[reason.kind] = hit
+        headline_kind = next(k for k in _HEADLINE_PRIORITY if k in kinds)
+        dedup_key = f"{icao}|notam|{hit.notam.id}"
+        posts.append(_build_one_post(
+            icao, airport, metar, bullets, headline_kind, dedup_key,
+            causa=_causa_clause(headline_kind, None, hit),
+            cover_subtitle=_format_notam_validity(hit.notam),
+            duracao_prevista=_format_notam_validity(hit.notam),
+            raw_snippet=hit.notam.texto,
+        ))
 
-    headline_kind = next((k for k in _HEADLINE_PRIORITY if k in kinds_present), kinds_present[0])
+    return posts
+
+
+def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
+                     causa, cover_subtitle, duracao_prevista, raw_snippet) -> PostContent:
+    """Monta um único PostContent (um card de notícia) a partir de um grupo de
+    motivos que já foi decidido como pertencendo à mesma notícia — ou o grupo de
+    condições de METAR do momento, ou um NOTAM específico. Ver build_post_content."""
     headline = _HEADLINE_LABEL[headline_kind]
-    severity = "alto" if any(k in _HIGH_SEVERITY_KINDS for k in kinds_present) else "atenção"
-
+    severity = "alto" if headline_kind in _HIGH_SEVERITY_KINDS else "atenção"
     updated_label = _metar_updated_label(metar) if metar else "Aviso NOTAM ativo"
 
-    # --- slide CAPA: título + linha secundária opcional ---
-    source = source_by_kind[headline_kind]
-    is_notam_headline = headline_kind in _ILLUSTRATION_BY_KIND
-    causa = _causa_clause(headline_kind, fields, source if is_notam_headline else None)
     cover_title = f"{_HEADLINE_LABEL_SENTENCE[headline_kind]} em {airport['city']}"
     if causa:
         cover_title += f" {causa}"
 
-    if is_notam_headline:
-        cover_subtitle = _format_notam_validity(source.notam)
-    else:
-        cover_subtitle = f"Atualizado {metar_local_time_short(metar)}" if metar else None
-
     background_category = "weather" if headline_kind in WEATHER_KINDS else _ILLUSTRATION_BY_KIND[headline_kind]
 
-    # --- dedup_key: identifica a condição pra automação não postar 2x (state.py) ---
-    # NOTAM tem id próprio e único — um mesmo NOTAM em vigor por dias não gera post
-    # repetido. Clima não tem id, então a chave é por dia (Brasília): uma trovoada
-    # que continua no dia seguinte é tratada como um aviso "novo" (atualização diária).
-    if is_notam_headline:
-        dedup_key = f"{icao}|notam|{source.notam.id}"
-    else:
-        hoje = (datetime.now(timezone.utc) + BRT_OFFSET).strftime("%Y-%m-%d")
-        dedup_key = f"{icao}|weather|{headline_kind}|{hoje}"
-
-    # --- slide EXPLICATIVO: sempre gerado (regra fixa 2026-08-23 — todo post é
-    # carrossel de no mínimo 2 slides: capa + explicativo) ---
-    needs_explicativo = True
-    explicativo = None
-    if needs_explicativo:
-        duracao = _format_notam_validity(source.notam) if is_notam_headline else None
-        if duracao is None and metar:
-            duracao = "Reavaliado a cada novo boletim METAR (de hora em hora)"
-        if is_notam_headline:
-            raw_snippet = source.notam.texto
-        else:
-            raw_snippet = metar.raw if metar else (evaluation.notam_hits[0].notam.texto if evaluation.notam_hits else "")
-        explicativo = ExplicativoContent(
-            subtitulo=f"{airport['city']} — {icao}",
-            o_que_aconteceu=" ".join(bullets),
-            o_que_significa=_IMPACT_TEXT.get(headline_kind, ""),
-            duracao_prevista=duracao,
-            raw_snippet=raw_snippet,
-        )
+    explicativo = ExplicativoContent(
+        subtitulo=f"{airport['city']} — {icao}",
+        o_que_aconteceu=" ".join(bullets),
+        o_que_significa=_IMPACT_TEXT.get(headline_kind, ""),
+        duracao_prevista=duracao_prevista,
+        raw_snippet=raw_snippet,
+    )
 
     # o "o que isso significa" sempre aparece — na legenda, e também no slide
-    # explicativo quando ele existe — pra quem não entende de aviação conseguir
-    # dimensionar o impacto prático (não só o jargão técnico dos bullets acima)
+    # explicativo — pra quem não entende de aviação conseguir dimensionar o
+    # impacto prático (não só o jargão técnico dos bullets acima)
     impacto = _IMPACT_TEXT.get(headline_kind, "")
 
     caption_lines = [
@@ -370,7 +369,7 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
         cover_title=cover_title,
         cover_subtitle=cover_subtitle,
         background_category=background_category,
-        needs_explicativo=needs_explicativo,
+        needs_explicativo=True,
         explicativo=explicativo,
         dedup_key=dedup_key,
     )
@@ -396,21 +395,18 @@ if __name__ == "__main__":
             notams = []
 
         evaluation = evaluate_airport(icao, metar, notams)
-        post = build_post_content(icao, airport, metar, evaluation)
-        if post is None:
-            continue
-
-        print(f"=== {post.headline} — {post.severity.upper()} — {post.city}/{post.uf} ({post.icao}) ===")
-        print(f"CAPA titulo: {post.cover_title}")
-        print(f"CAPA subtitulo: {post.cover_subtitle}")
-        print(f"fundo: {post.background_category} | explicativo? {post.needs_explicativo}")
-        if post.explicativo:
-            e = post.explicativo
-            print(f"  [explicativo] {e.subtitulo}")
-            print(f"  o que aconteceu: {e.o_que_aconteceu}")
-            print(f"  o que significa: {e.o_que_significa}")
-            print(f"  duracao prevista: {e.duracao_prevista}")
-            print(f"  raw: {e.raw_snippet}")
-        print("--- legenda ---")
-        print(post.caption)
-        print()
+        for post in build_post_content(icao, airport, metar, evaluation):
+            print(f"=== {post.headline} — {post.severity.upper()} — {post.city}/{post.uf} ({post.icao}) — {post.dedup_key} ===")
+            print(f"CAPA titulo: {post.cover_title}")
+            print(f"CAPA subtitulo: {post.cover_subtitle}")
+            print(f"fundo: {post.background_category} | explicativo? {post.needs_explicativo}")
+            if post.explicativo:
+                e = post.explicativo
+                print(f"  [explicativo] {e.subtitulo}")
+                print(f"  o que aconteceu: {e.o_que_aconteceu}")
+                print(f"  o que significa: {e.o_que_significa}")
+                print(f"  duracao prevista: {e.duracao_prevista}")
+                print(f"  raw: {e.raw_snippet}")
+            print("--- legenda ---")
+            print(post.caption)
+            print()

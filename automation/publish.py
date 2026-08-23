@@ -126,9 +126,13 @@ def publish_container(ig_user_id: str, token: str, creation_id: str) -> str:
     return result["id"]
 
 
-def stage_post(icao: str):
+def stage_post(icao: str, index: int = 0):
     """Monta o post (dados + slides), hospeda as imagens e cria o container —
-    tudo isso sem tornar nada público. Devolve (creation_id, image_urls, caption)."""
+    tudo isso sem tornar nada público. Um aeroporto pode ter mais de um post
+    relevante ao mesmo tempo (motivos distintos, ver content.py) — `index`
+    escolhe qual deles estagear; os outros ficam listados no retorno pra você
+    saber que existem. Devolve (creation_id, image_urls, caption, ig_user_id,
+    page_token, total_posts)."""
     airport = next((a for a in AIRPORTS if a["code"] == icao), None)
     if airport is None:
         raise PublishError(f"{icao} não está em airports.py")
@@ -143,17 +147,20 @@ def stage_post(icao: str):
         notams = []
 
     evaluation = evaluate_airport(icao, metar, notams)
-    post = build_post_content(icao, airport, metar, evaluation)
-    if post is None:
+    posts = build_post_content(icao, airport, metar, evaluation)
+    if not posts:
         raise PublishError(f"{icao} não tem nenhum motivo ativo pra postar agora")
+    if index >= len(posts):
+        raise PublishError(f"{icao} só tem {len(posts)} post(s) relevante(s) agora (índice {index} não existe)")
 
+    post = posts[index]
     paths = render_post_slides(post)
     image_urls = host_images_on_github(paths, icao)
 
     _, page_token, ig_user_id = get_publishing_credentials()
     creation_id = create_container(ig_user_id, page_token, image_urls, post.caption)
 
-    return creation_id, image_urls, post.caption, ig_user_id, page_token
+    return creation_id, image_urls, post.caption, ig_user_id, page_token, len(posts)
 
 
 if __name__ == "__main__":
@@ -161,14 +168,18 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 3 or sys.argv[2] not in ("--stage", "--go"):
         print("Uso:")
-        print("  python publish.py <ICAO> --stage           (monta e prepara, não publica)")
+        print("  python publish.py <ICAO> --stage [indice]   (monta e prepara, não publica)")
         print("  python publish.py <ICAO> --go <creation_id> (publica de fato)")
         sys.exit(1)
 
     icao_arg = sys.argv[1].upper()
 
     if sys.argv[2] == "--stage":
-        creation_id, image_urls, caption, ig_user_id, page_token = stage_post(icao_arg)
+        index_arg = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+        creation_id, image_urls, caption, ig_user_id, page_token, total = stage_post(icao_arg, index_arg)
+        if total > 1:
+            print(f"{icao_arg} tem {total} posts relevantes agora (motivos distintos) — "
+                  f"estageando o índice {index_arg}. Pra ver os outros: --stage 1, --stage 2, etc.")
         print(f"Container criado (ainda NÃO publicado): {creation_id}")
         print("Imagens:")
         for url in image_urls:

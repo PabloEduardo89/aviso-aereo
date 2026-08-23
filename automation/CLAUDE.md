@@ -175,6 +175,20 @@ Dois modos, pra dois momentos diferentes:
 
 ### Automação total (regra fixa, decidido 2026-08-23)
 
+- **Um post por notícia relevante, não um post por aeroporto.** `build_post_content`
+  (content.py) devolve uma LISTA de posts, não um post só — um mesmo aeroporto só
+  gera mais de um post quando existem motivos DISTINTOS e não relacionados ao
+  mesmo tempo (ex.: uma pista fechada e, à parte, uma trovoada); cada NOTAM
+  relevante é sua própria notícia, e todas as condições de METAR do momento
+  juntas contam como uma notícia só (é uma situação meteorológica, não várias).
+  Isso não é o padrão comum — a maioria dos aeroportos não vai gerar post
+  nenhum na maior parte do tempo, e quando gerar, normalmente é só um.
+- **Nunca simultâneo — sempre espaçado.** Mesmo quando há mais de um post
+  relevante pra sair na mesma execução (do mesmo aeroporto ou de aeroportos
+  diferentes), eles NÃO saem juntos: `run_cycle.py` espera
+  `MIN_INTERVAL_SECONDS` (6 minutos) entre uma publicação e a próxima, dentro
+  da mesma execução. Importante: o usuário corrigiu explicitamente esse ponto
+  em 2026-08-23 — não implementar publicação em lote/paralela de novo.
 - **Onde roda**: GitHub Actions (nuvem), não depende do PC do usuário ligado.
   Workflow em `.github/workflows/post-avisos.yml`, cron `'0 * * * *'` (de
   hora em hora) + `workflow_dispatch` pra rodar manualmente pela aba Actions.
@@ -187,20 +201,22 @@ Dois modos, pra dois momentos diferentes:
   repetição a cada hora). **Sem isso, um NOTAM de dias viraria post repetido
   a cada execução.**
 - **Limite de ritmo** (`run_cycle.py`, `MAX_POSTS_PER_RUN = 3`): no máximo 3
-  posts NOVOS por execução, mesmo que mais aeroportos tenham virado condição
-  nova ao mesmo tempo (ex.: frente fria afetando vários aeroportos numa
-  mesma hora) — o resto sai nas próximas execuções, nunca se perde. Existe
-  pra não parecer comportamento de bot/spam pra Meta (a API do Instagram tem
-  um teto de ~25 posts/24h por conta, e rajadas de posts parecidos em pouco
-  tempo são o tipo de padrão que sistemas antispam costumam sinalizar).
+  posts NOVOS por execução — o resto sai nas próximas execuções, nunca se
+  perde. Existe pra não parecer comportamento de bot/spam pra Meta (a API do
+  Instagram tem um teto de ~25 posts/24h por conta, e rajadas de posts
+  parecidos em pouco tempo são o tipo de padrão que sistemas antispam
+  costumam sinalizar) — combinado com o espaçamento de 6 min acima.
 - **Lançamento** (2026-08-23): o registro (`state/posted.json`) foi
-  "primado" com todas as condições ativas no dia do lançamento — incluindo os
-  2 posts de teste manuais já publicados (Manaus/SBEG, Salvador/SBSV, com o
-  media_id real) e as demais ~15 condições já ativas na época, marcadas como
-  vistas sem post real (`media_id: "skipped_at_launch_no_post"`) — pra
-  automação começar reagindo só a coisas NOVAS a partir do lançamento, sem
-  rajada inicial. Isso foi uma escolha pontual do lançamento, não repetir
-  esse "priming" depois — a partir daqui o registro só cresce organicamente.
+  "primado" com todas as condições ativas no dia do lançamento (30 notícias
+  distintas nos ~28 aeroportos com algo ativo) — incluindo os 2 posts de
+  teste manuais já publicados (Manaus/SBEG NOTAM 12308060, Salvador/SBSV
+  NOTAM 12399153, com o media_id real) e as demais marcadas como vistas sem
+  post real (`media_id: "skipped_at_launch_no_post"`) — pra automação
+  começar reagindo só a coisas NOVAS a partir do lançamento, sem rajada
+  inicial. Isso foi uma escolha pontual do lançamento, não repetir esse
+  "priming" depois — a partir daqui o registro só cresce organicamente. Se o
+  formato do `dedup_key` mudar de novo no futuro, o registro precisa ser
+  refeito com a chave nova (senão perde efeito e volta a dar rajada).
 
 ### Segredos necessários no GitHub (Settings → Secrets and variables → Actions)
 

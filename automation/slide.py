@@ -54,6 +54,15 @@ def _accent(post: PostContent) -> str:
     return COLOR_ACCENT_ALTO if post.severity == "alto" else COLOR_ACCENT_ATENCAO
 
 
+def _post_slug(post: PostContent) -> str:
+    """Identificador único do post pro nome do arquivo — necessário desde que um
+    mesmo aeroporto pode gerar mais de um post ao mesmo tempo (motivos distintos
+    viram notícias separadas, ver content.py). Deriva do dedup_key, tirando o
+    prefixo do ICAO (já é o nome da pasta/arquivo) e trocando '|' por '_'."""
+    _, rest = post.dedup_key.split("|", 1)
+    return rest.replace("|", "_").replace("/", "-")
+
+
 def _wrap_text(draw, text, font, max_width):
     words = text.split()
     lines = []
@@ -165,7 +174,7 @@ def render_capa_slide(post: PostContent, out_path: str | None = None) -> str:
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     if out_path is None:
-        out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_1_capa.png")
+        out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_1_capa.png")
     img.convert("RGB").save(out_path, "PNG")
     return out_path
 
@@ -236,7 +245,7 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     if out_path is None:
-        out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_2_explicativo.png")
+        out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_2_explicativo.png")
     img.save(out_path, "PNG")
     return out_path
 
@@ -273,12 +282,9 @@ if __name__ == "__main__":
             notams = []
 
         evaluation = evaluate_airport(icao, metar, notams)
-        post = build_post_content(icao, airport, metar, evaluation)
-        if post is None:
-            continue
-
-        paths = render_post_slides(post)
-        print(f"[{icao}] {len(paths)} slide(s): {', '.join(paths)}")
-        generated += 1
+        for post in build_post_content(icao, airport, metar, evaluation):
+            paths = render_post_slides(post)
+            print(f"[{icao}] ({post.dedup_key}) {len(paths)} slide(s): {', '.join(paths)}")
+            generated += 1
 
     print(f"\n{generated} post(s) gerado(s) em {OUTPUT_DIR}")
