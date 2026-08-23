@@ -108,5 +108,125 @@
     "date_taken": "2024-08-23",
     "attribution_required": true,
     "notes": "Fachada ao entardecer, nome do aeroporto bem legível, pessoas reais circulando."
+  },
+  "SBFL": {
+    "airport": "Aeroporto Internacional de Florianópolis — Hercílio Luz",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_de_Florian%C3%B3polis_.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/6/62/Aeroporto_de_Florian%C3%B3polis_.jpg",
+    "author": "Boaventuravinicius",
+    "license": "CC BY-SA 3.0",
+    "date_taken": "2019-10-10",
+    "attribution_required": true,
+    "notes": "Terminal novo (inaugurado 2019), parede amarela característica, check-in kiosks."
+  },
+  "SBGO": {
+    "airport": "Aeroporto de Goiânia — Santa Genoveva",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Santa_Genoveva,_Goi%C3%A2nia,_agosto_de_2018.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/0/08/Aeroporto_Santa_Genoveva%2C_Goi%C3%A2nia%2C_agosto_de_2018.jpg",
+    "author": "Fronteira (Wikimedia Commons)",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2018-08-04",
+    "attribution_required": true,
+    "notes": "Fachada com nome grande e legível, pessoas reais."
+  },
+  "SBVT": {
+    "airport": "Aeroporto Internacional de Vitória — Eurico de Aguiar Salles",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Eurico_de_Aguiar_Salles_Airport_-_01.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/9/9c/Eurico_de_Aguiar_Salles_Airport_-_01.jpg",
+    "author": "Oleg Yunakov",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2018-12-05",
+    "attribution_required": true,
+    "notes": "Saguão interno com painel de chegadas/partidas INFRAERO e pessoas reais."
+  },
+  "SBRF": {
+    "airport": "Aeroporto Internacional do Recife — Guararapes/Gilberto Freyre",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Recife_airport_terminal.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/b/bd/Recife_airport_terminal.jpg",
+    "author": "Arne Müseler / www.arne-mueseler.com",
+    "license": "CC BY-SA 3.0 DE",
+    "date_taken": "2022-02-23",
+    "attribution_required": true,
+    "notes": "Arquitetura futurista marcante, aeronaves LATAM/Azul em pátio."
+  },
+  "SBFZ": {
+    "airport": "Aeroporto Internacional de Fortaleza — Pinto Martins",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Fachada_do_Terminal_do_Aeroporto_Internacional_de_Fortaleza_-_Pinto_Martins.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/b/be/Fachada_do_Terminal_do_Aeroporto_Internacional_de_Fortaleza_-_Pinto_Martins.jpg",
+    "author": "Alexandro Dias",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2009-07-06",
+    "attribution_required": true,
+    "notes": "Foto antiga, mas a torre e o nome 'Pinto Martins'/INFRAERO batem com a fachada atual (nome restaurado em 2023 após período removido pela Fraport)."
+  },
+  "SBCG": {
+    "airport": "Aeroporto Internacional de Campo Grande",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Internacional_de_Campo_Grande_MS,_20-07-2025.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/1/1e/Aeroporto_Internacional_de_Campo_Grande_MS%2C_20-07-2025.jpg",
+    "author": "Jcornelius (Cornelius Kibelka)",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2025-07-20",
+    "attribution_required": true,
+    "notes": "Fachada com nome grande em verde, muito recente, pessoas reais."
+  },
+  "SBJP": {
+    "airport": "Aeroporto Internacional de João Pessoa — Presidente Castro Pinto",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Internacional_Presidente_Castro_Pinto,_Jo%C3%A3o_Pessoa..jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/b/ba/Aeroporto_Internacional_Presidente_Castro_Pinto%2C_Jo%C3%A3o_Pessoa..jpg",
+    "author": "Toin1620",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2024-10-20",
+    "attribution_required": true,
+    "notes": "Fachada nova, nome 'JOÃO PESSOA' bem grande, logo da operadora Aena."
+  },
+  "SBSG": {
+    "airport": "Aeroporto Internacional de Natal — Governador Aluízio Alves (São Gonçalo do Amarante)",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Natal_airport_terminal.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Natal_airport_terminal.jpg",
+    "author": "Arne Müseler / www.arne-mueseler.com",
+    "license": "CC BY-SA 3.0 DE",
+    "date_taken": "2022-02-23",
+    "attribution_required": true,
+    "notes": "IMPORTANTE: não confundir com o Aeroporto Augusto Severo (antigo, SBNT, desativado p/ aviação civil em 2014). Saguão com fila de check-in e pessoas reais."
+  },
+  "SBAR": {
+    "airport": "Aeroporto Internacional Santa Maria — Aracaju",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Fachada_Aeroporto_de_Aracaju.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/b/b7/Fachada_Aeroporto_de_Aracaju.jpg",
+    "author": "Rocaoll",
+    "license": "CC0 1.0 (domínio público)",
+    "date_taken": "2025-01-03",
+    "attribution_required": false,
+    "notes": "Fachada com nome grande, logo da operadora Aena, muito recente. Foto precisou de correção de orientação (EXIF) antes de usar."
+  },
+  "SBKP": {
+    "airport": "Aeroporto Internacional de Viracopos — Campinas",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Campinas_-_Aeroporto_de_Viracopos_(abril_2023)_01.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/7/73/Campinas_-_Aeroporto_de_Viracopos_%28abril_2023%29_01.jpg",
+    "author": "Sintegrity",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2023-04-16",
+    "attribution_required": true,
+    "notes": "Vista pela janela do avião mostrando torre de controle e terminal de cargas — não é uma fachada clássica, mas é a melhor opção encontrada."
+  },
+  "SBPJ": {
+    "airport": "Aeroporto de Palmas — Brigadeiro Lysias Rodrigues",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_Palmas_05_2014_8495.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/7/78/Aeroporto_Palmas_05_2014_8495.jpg",
+    "author": "Mariordo (Mario Roberto Durán Ortiz)",
+    "license": "CC BY-SA 4.0",
+    "date_taken": "2014-05-06",
+    "attribution_required": true,
+    "notes": "Torre de controle e pátio, veículo de rampa da GOL (companhia ainda ativa)."
+  },
+  "SBTE": {
+    "airport": "Aeroporto Internacional de Teresina — Senador Petrônio Portella",
+    "source_page": "https://commons.wikimedia.org/wiki/File:Aeroporto_teresina_pi_brasil.jpg",
+    "source_file": "https://upload.wikimedia.org/wikipedia/commons/0/07/Aeroporto_teresina_pi_brasil.jpg",
+    "author": "Ricardo630",
+    "license": "CC BY-SA 3.0",
+    "date_taken": "2011-04-07",
+    "attribution_required": true,
+    "notes": "Foto de 2011, mas nome 'TERESINA' e torre bem visíveis, sem elementos datados problemáticos."
   }
 }

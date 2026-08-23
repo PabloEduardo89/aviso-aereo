@@ -97,11 +97,17 @@ usuário pedir explicitamente — por ora é só a diretriz registrada.
      último recurso quando não há foto curada e o motivo é operacional
      (pista/torre/aux. navegação)
 
-Status atual (2026-08-23): **11 de 30 aeroportos têm foto curada** — SBEG
+Status atual (2026-08-23): **23 de 30 aeroportos têm foto curada** — SBEG
 (Manaus), SBGR (Guarulhos), SBSP (Congonhas), SBCF (Confins/BH), SBRJ (Santos
 Dumont), SBGL (Galeão), SBBR (Brasília), SBPA (Porto Alegre), SBBE (Belém),
-SBSV (Salvador), SBCY (Cuiabá). Faltam 19: SBFL, SBMO, SBMQ, SBFZ, SBVT, SBGO,
-SBSL, SBCG, SBJP, SBCT, SBTE, SBSG, SBPV, SBBV, SBAR, SBPJ, SBKP, SBRB, SBRF.
+SBSV (Salvador), SBCY (Cuiabá), SBFL (Florianópolis), SBGO (Goiânia), SBVT
+(Vitória), SBRF (Recife), SBFZ (Fortaleza), SBCG (Campo Grande), SBJP (João
+Pessoa), SBSG (Natal — atenção: é o Aeroporto Aluízio Alves/São Gonçalo do
+Amarante, NÃO o antigo Augusto Severo, desativado p/ civil em 2014), SBAR
+(Aracaju), SBKP (Viracopos/Campinas), SBPJ (Palmas), SBTE (Teresina).
+Faltam 7: SBMO (Maceió), SBMQ (Macapá), SBSL (São Luís), SBCT (Curitiba —
+tentado 2x, só achei foto de 2006, pulado), SBPV (Porto Velho), SBBV (Boa
+Vista), SBRB (Rio Branco).
 Ir preenchendo os outros ao longo do tempo é o principal jeito de "melhorar o
 post" — quanto mais aeroportos tiverem foto real, menos posts caem no
 fallback genérico/ilustração. Busca ampliada além do Wikimedia Commons quando
@@ -114,6 +120,17 @@ Biblioteca genérica (`assets/photos/generic/<categoria>/`, ver seção abaixo):
 pessoas) ainda está vazia — não achei rapidamente uma foto brasileira boa,
 livre de direitos e sem logo de companhia extinta. Prioridade pra próxima
 sessão de curadoria.
+
+### Cuidado com fotos muito panorâmicas (lição aprendida 2026-08-23)
+
+`backgrounds.cover_resize` faz um corte central simples (estica pela altura e
+corta as bordas laterais) — em fotos com proporção MUITO larga (ex.: um
+panorama 3861×1059, quase 4:1), isso corta fora a parte que mais importa (o
+nome do aeroporto ficou de fora no primeiro corte da foto de Teresina/SBTE).
+Antes de salvar uma foto assim em `assets/photos/`, recorte manualmente uma
+região que mantenha o elemento identificador (nome/torre) centralizado, numa
+proporção mais próxima de retrato/quadrada, e só depois deixe o
+`cover_resize` fazer o ajuste fino pro tamanho do slide.
 
 ### Critério pra escolher uma foto nova
 
