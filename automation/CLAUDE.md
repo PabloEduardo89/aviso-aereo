@@ -281,12 +281,14 @@ conteúdo genérico competiria com a cota de ~25 posts/24h da API e criaria um
 padrão repetitivo (mesmo tipo de post, todo dia) — decidiu por um intervalo
 maior em vez disso.
 
-- **Conteúdo**: rotação fixa de tópicos (`fallback_content.TOPICS`) nas 5
+- **Conteúdo**: rotação fixa de tópicos (`fallback_content.TOPICS`) nas 6
   categorias pedidas pelo usuário — regras/leis/regulamentos da aviação
   (geral e comercial), significado de códigos de aeroporto (IATA/ICAO,
   numeração de pista), o que são METAR e NOTAM, matrícula/rastreamento de
-  aeronaves, e curiosidades sobre aviação executiva (jatinhos — categorias,
-  custo, instalações). Passa por todos os tópicos em ordem antes de repetir
+  aeronaves, curiosidades sobre aviação executiva (jatinhos — categorias,
+  custo, instalações) e mercado de trabalho de aeronautas — piloto,
+  comissário, mecânico de aeronaves — no Brasil e fora (adicionada
+  2026-08-24). Passa por todos os tópicos em ordem antes de repetir
   qualquer um (`_meta.fallback_topic_index`).
 - **Nunca é confundido com um alerta real**: `severity="informativo"` usa cor
   azul (`COLOR_ACCENT_INFO` em `slide.py`), diferente do vermelho/âmbar dos
