@@ -25,6 +25,7 @@ MARGIN = 72
 
 COLOR_ACCENT_ALTO = "#E9543F"      # vermelho — mesmo tom do duotone de fundo
 COLOR_ACCENT_ATENCAO = "#F2A93B"   # âmbar
+COLOR_ACCENT_INFO = "#3B82C4"      # azul — conteúdo educativo de fallback, nunca vermelho/âmbar (não é alerta)
 COLOR_BLACK_BLOCK = "#0A0A0A"
 COLOR_WHITE = "#FFFFFF"
 COLOR_WHITE_MUTED = "#C9C9C9"
@@ -51,7 +52,11 @@ def _font(path, size):
 
 
 def _accent(post: PostContent) -> str:
-    return COLOR_ACCENT_ALTO if post.severity == "alto" else COLOR_ACCENT_ATENCAO
+    if post.severity == "alto":
+        return COLOR_ACCENT_ALTO
+    if post.severity == "informativo":
+        return COLOR_ACCENT_INFO
+    return COLOR_ACCENT_ATENCAO
 
 
 def _post_slug(post: PostContent) -> str:
@@ -129,7 +134,7 @@ def render_capa_slide(post: PostContent, out_path: str | None = None) -> str:
     # kicker = código + UF (informação nova, já que o título abaixo repete o
     # nome da cidade e a categoria do aviso) — a cor da etiqueta ainda indica a severidade
     font_kicker = _font(FONT_SANS_BOLD, 26)
-    kicker_text = f"{post.icao} · {post.uf}"
+    kicker_text = post.kicker_text or f"{post.icao} · {post.uf}"
     kicker_h = 46
 
     font_title, title_lines = _fit_title(draw, post.cover_title, FONT_SANS_BOLD, max_w,
@@ -223,25 +228,27 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
             y += body_line_h
         y += 26
 
-    draw_block("O QUE ACONTECEU:", e.o_que_aconteceu)
-    draw_block("O QUE ISSO SIGNIFICA:", e.o_que_significa)
+    draw_block(e.heading_1, e.o_que_aconteceu)
+    draw_block(e.heading_2, e.o_que_significa)
     if e.duracao_prevista:
         draw_block("DURAÇÃO PREVISTA:", e.duracao_prevista)
 
-    # card de rodapé com o registro bruto (METAR/NOTAM) — na falta de mapa/foto
-    # de apoio, é a informação mais autêntica disponível pra mostrar ali
-    card_h = 190
-    card_top = HEIGHT - MARGIN - card_h
-    if card_top > y + 20:
-        font_label = _font(FONT_SANS_BOLD, 22)
-        draw.text((MARGIN, card_top - 34), "REGISTRO BRUTO (METAR/NOTAM)", font=font_label, fill="#8A8A8A")
-        draw.rounded_rectangle([(MARGIN, card_top), (WIDTH - MARGIN, HEIGHT - MARGIN)],
-                                radius=20, fill=COLOR_CARD_BG)
-        font_mono = _font(FONT_MONO, 25)
-        my = card_top + 28
-        for line in _wrap_text(draw, e.raw_snippet, font_mono, max_w - 48)[:5]:
-            draw.text((MARGIN + 24, my), line, font=font_mono, fill="#333333")
-            my += 33
+    # card de rodapé com o registro bruto (METAR/NOTAM) ou exemplo real — na
+    # falta de mapa/foto de apoio, é a informação mais autêntica disponível
+    # pra mostrar ali; oculto quando não há snippet (ex.: alguns posts educativos)
+    if e.raw_snippet:
+        card_h = 190
+        card_top = HEIGHT - MARGIN - card_h
+        if card_top > y + 20:
+            font_label = _font(FONT_SANS_BOLD, 22)
+            draw.text((MARGIN, card_top - 34), e.raw_snippet_label, font=font_label, fill="#8A8A8A")
+            draw.rounded_rectangle([(MARGIN, card_top), (WIDTH - MARGIN, HEIGHT - MARGIN)],
+                                    radius=20, fill=COLOR_CARD_BG)
+            font_mono = _font(FONT_MONO, 25)
+            my = card_top + 28
+            for line in _wrap_text(draw, e.raw_snippet, font_mono, max_w - 48)[:5]:
+                draw.text((MARGIN + 24, my), line, font=font_mono, fill="#333333")
+                my += 33
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     if out_path is None:

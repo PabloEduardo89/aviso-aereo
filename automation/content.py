@@ -216,7 +216,10 @@ class ExplicativoContent:
     o_que_aconteceu: str       # prosa corrida juntando os motivos
     o_que_significa: str       # texto de impacto (ver _IMPACT_TEXT)
     duracao_prevista: str | None
-    raw_snippet: str           # texto bruto (METAR ou NOTAM) pro card de rodapé
+    raw_snippet: str           # texto bruto (METAR ou NOTAM) pro card de rodapé; "" oculta o card (ver fallback_content.py)
+    heading_1: str = "O QUE ACONTECEU:"      # sobrescrito pelo fallback_content.py (posts educativos)
+    heading_2: str = "O QUE ISSO SIGNIFICA:"
+    raw_snippet_label: str = "REGISTRO BRUTO (METAR/NOTAM)"
 
 
 @dataclass
@@ -226,7 +229,7 @@ class PostContent:
     uf: str
     headline: str            # ex.: "PISTA FECHADA" (rótulo curto, usado em logs/selo)
     headline_kind: str        # ex.: "rwy_closed" — usado por backgrounds.py pra escolher a foto genérica mais pertinente
-    severity: str             # "alto" ou "atenção"
+    severity: str             # "alto", "atenção" ou "informativo" (posts educativos de fallback — ver fallback_content.py)
     bullets: list             # frases naturais, uma por motivo
     updated_label: str        # ex.: "METAR das 18:00 UTC (15:00 em Brasília)"
     caption: str              # texto completo pra legenda do Instagram
@@ -236,6 +239,7 @@ class PostContent:
     needs_explicativo: bool      # True quando um único slide de capa não é suficiente
     explicativo: ExplicativoContent | None
     dedup_key: str            # identifica a condição pra automação não postar a mesma coisa 2x (ver state.py)
+    kicker_text: str | None = None  # sobrescreve o kicker padrão "{icao} · {uf}" (usado pelo fallback educativo)
 
 
 def _metar_updated_label(metar: MetarResult) -> str:

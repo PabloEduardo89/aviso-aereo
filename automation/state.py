@@ -33,3 +33,14 @@ def is_posted(state: dict, key: str) -> bool:
 
 def mark_posted(state: dict, key: str, media_id: str, timestamp: str) -> None:
     state[key] = {"media_id": media_id, "posted_at": timestamp}
+
+
+# chave "_meta" guarda controle da automação (não é uma condição postada) — usada
+# pelo fallback educativo (run_cycle.py) pra saber há quanto tempo não sai post
+# nenhum e qual o próximo tópico da rotação (fallback_content.py)
+def get_meta(state: dict, key: str, default=None):
+    return state.get("_meta", {}).get(key, default)
+
+
+def set_meta(state: dict, key: str, value) -> None:
+    state.setdefault("_meta", {})[key] = value

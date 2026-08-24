@@ -169,6 +169,12 @@ GENERIC_PHOTOS_MANIFEST = os.path.join(GENERIC_PHOTOS_DIR, "manifest.json")
 _GENERIC_CATEGORY_BY_KIND = {
     "rwy_closed": "queue",
     "twr_closed": "queue",
+    # posts educativos de fallback (ver fallback_content.py) — variedade de foto por tema
+    "edu_rules": "terminal",
+    "edu_codes": "terminal",
+    "edu_notam_metar": "aircraft",
+    "edu_registration": "aircraft",
+    "edu_jets": "aircraft",
 }
 _DEFAULT_GENERIC_CATEGORY = "aircraft"
 

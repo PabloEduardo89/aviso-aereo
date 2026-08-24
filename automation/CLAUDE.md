@@ -240,6 +240,34 @@ Dois modos, pra dois momentos diferentes:
   formato do `dedup_key` mudar de novo no futuro, o registro precisa ser
   refeito com a chave nova (senão perde efeito e volta a dar rajada).
 
+### Fallback educativo (regra fixa, decidido 2026-08-23)
+
+Quando NENHUM aeroporto monitorado tem aviso real ativo, a conta ficava muda
+naquele ciclo. Pra evitar isso, `run_cycle.py` (`maybe_build_fallback`) publica
+um carrossel educativo de `fallback_content.py` — mas só quando **não há
+candidato real nesta execução E já se passaram
+`MIN_FALLBACK_INTERVAL_SECONDS` (4h) desde o último post, real ou fallback**
+(`_meta.last_post_at` em `state/posted.json`, via `get_meta`/`set_meta` de
+`state.py`). O intervalo é propositalmente bem mais espaçado que "1 por hora"
+— o usuário pediu isso inicialmente, mas foi alertado que rajada diária de
+conteúdo genérico competiria com a cota de ~25 posts/24h da API e criaria um
+padrão repetitivo (mesmo tipo de post, todo dia) — decidiu por um intervalo
+maior em vez disso.
+
+- **Conteúdo**: rotação fixa de tópicos (`fallback_content.TOPICS`) nas 5
+  categorias pedidas pelo usuário — regras/leis/regulamentos da aviação
+  (geral e comercial), significado de códigos de aeroporto (IATA/ICAO,
+  numeração de pista), o que são METAR e NOTAM, matrícula/rastreamento de
+  aeronaves, e curiosidades sobre aviação executiva (jatinhos — categorias,
+  custo, instalações). Passa por todos os tópicos em ordem antes de repetir
+  qualquer um (`_meta.fallback_topic_index`).
+- **Nunca é confundido com um alerta real**: `severity="informativo"` usa cor
+  azul (`COLOR_ACCENT_INFO` em `slide.py`), diferente do vermelho/âmbar dos
+  avisos de verdade — mesmo padrão de carrossel (capa + explicativo), mas
+  visualmente distinto de propósito.
+- Se algum dia adicionar tópico novo, só acrescentar em `TOPICS` — a rotação
+  e o dedup (`dedup_key = fallback|<slug>|<data>`) já lidam com isso sozinhos.
+
 ### Segredos necessários no GitHub (Settings → Secrets and variables → Actions)
 
 `INSTAGRAM_TOKEN`, `REDEMET_API_KEY`, `AISWEB_API_KEY`, `AISWEB_API_PASS` —
