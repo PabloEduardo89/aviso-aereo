@@ -175,6 +175,7 @@ _GENERIC_CATEGORY_BY_KIND = {
     "edu_notam_metar": "aircraft",
     "edu_registration": "aircraft",
     "edu_jets": "aircraft",
+    "edu_careers": "terminal",
 }
 _DEFAULT_GENERIC_CATEGORY = "aircraft"
 

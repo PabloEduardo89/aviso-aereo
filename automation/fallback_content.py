@@ -199,6 +199,33 @@ TOPICS = [
                "compensam justamente pela ausência de qualquer parada no meio do trajeto.",
         hashtags="#AvisoAereo #AviaçãoExecutiva #JatosExecutivos #Curiosidade",
     ),
+    # --- mercado de trabalho aeronáutico: pilotos, comissários, mecânicos ---
+    Topic(
+        slug="carreira_piloto", kind="edu_careers", kicker_text="MERCADO DE TRABALHO",
+        cover_title="Como é o mercado de trabalho pra quem quer ser piloto",
+        heading_1="NO BRASIL:",
+        body_1="Virar piloto comercial exige escola de aviação civil homologada pela ANAC e muitas horas "
+               "de voo pra evoluir — de instrutor ou aviação executiva/de carga até chegar numa companhia "
+               "aérea grande — um caminho que costuma levar anos e varia com o ciclo econômico do setor.",
+        heading_2="FORA DO BRASIL:",
+        body_2="Em mercados como EUA e Oriente Médio, a aposentadoria em massa de uma geração de pilotos "
+               "tem gerado escassez recorrente — o que atrai brasileiros formados a buscar oportunidade "
+               "fora, geralmente precisando revalidar a licença no país de destino.",
+        hashtags="#AvisoAereo #CarreiraDePiloto #Aviação #MercadoDeTrabalho",
+    ),
+    Topic(
+        slug="carreira_comissario_mecanico", kind="edu_careers", kicker_text="MERCADO DE TRABALHO",
+        cover_title="Comissário e mecânico de aeronaves: como entrar na área",
+        heading_1="COMISSÁRIO DE VOO:",
+        body_1="Exige curso específico homologado pela ANAC (o CCF, Curso de Formação de Comissários), "
+               "inglês fluente pesa bastante na seleção das companhias, e a demanda por novos comissários "
+               "cresce e encolhe junto com a abertura de rotas novas.",
+        heading_2="MECÂNICO DE AERONAVES:",
+        body_2="A formação passa por curso técnico específico e, depois, por licenças da ANAC por tipo de "
+               "aeronave — é uma área com demanda global relativamente estável, já que toda aeronave em "
+               "operação, em qualquer país, precisa de manutenção certificada.",
+        hashtags="#AvisoAereo #ComissárioDeVoo #MecânicoDeAeronaves #MercadoDeTrabalho",
+    ),
 ]
 
 
