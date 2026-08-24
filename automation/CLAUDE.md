@@ -53,33 +53,60 @@ aparecer em pelo menos um destes dois lugares — os dois é ainda melhor:
 Nunca publicar um post só com o fato técnico cru, sem essa camada de
 explicação em linguagem simples.
 
-### Pendente pra próxima revisão do texto (feedback 2026-08-23, ainda não aplicado)
+### Título de capa com "Aeroporto" + consequência (aplicado 2026-08-24)
 
-O usuário testou o carrossel de Salvador e gostou, mas pediu mais ênfase em
-**VOOS** especificamente no texto de `_IMPACT_TEXT` (content.py). Hoje o texto
-de `rwy_closed` diz algo como "há chance real de atraso, reprogramação ou
-desvio" — genérico demais. O pedido é deixar explícito que é o **voo do
-passageiro** que atrasa/desvia, e detalhar o que "desvio" significa na
-prática (pousar em **pista diferente** ou **aeroporto diferente** do
-planejado) — não é uma correção urgente, é uma revisão de texto pra próxima
-vez que alguém mexer em `_IMPACT_TEXT`. Reescrever os textos de
-`_IMPACT_TEXT` (todos os headline_kind, não só rwy_closed) nessa linha mais
-enfática sobre voos antes de considerar essa regra "fechada".
+`cover_title` (content.py, `_build_one_post`) segue o formato fixo:
+`"Aeroporto de {cidade}: {problema} pode atrasar ou alterar voos"` — ex.:
+"Aeroporto de Natal: risco de tempestade pode atrasar ou alterar voos". As
+duas palavras-chave ("Aeroporto" e "atrasar/alterar voos") sempre aparecem no
+título da capa, por pedido explícito do usuário (exemplo que ele deu:
+"Aeroporto de Natal: Risco de Tempestade pode atrasar / alterar voos") — é o
+que gera urgência pra parar e ler o post. Não voltar ao formato antigo
+("{categoria} em {cidade}") sem o usuário pedir.
 
-### Pendente: título de capa deve conter "AEROPORTO" e a consequência (feedback 2026-08-23, ainda não aplicado)
+### `_IMPACT_TEXT` com ênfase em VOO (aplicado 2026-08-24)
 
-Hoje o `cover_title` (content.py, ver `build_post_content`) segue o formato
-"{categoria} em {cidade}" — ex.: "Pista fechada em Salvador por manutenção".
-O usuário apontou que **"aeroporto" é uma palavra-chave importante** que está
-faltando, e que o título ficaria muito mais informativo e chamativo se já
-citasse a consequência prática direto no título, não só no slide/legenda.
-Exemplo dado por ele: "Aeroporto de Salvador tem pista fechada e pode haver
-cancelamentos e atrasos". Reescrever `cover_title` nessa linha — liderando
-com "Aeroporto de {cidade}" e encerrando com uma consequência concreta
-(atrasos/cancelamentos/desvios) — é a próxima revisão de texto pendente,
-junto com a de `_IMPACT_TEXT` acima (as duas apontam pro mesmo objetivo: ser
-mais explícito sobre o impacto no voo do passageiro). Não aplicar sem o
-usuário pedir explicitamente — por ora é só a diretriz registrada.
+Os textos de `_IMPACT_TEXT` (content.py, um por `headline_kind`) foram
+reescritos pra deixar explícito que é **o voo do passageiro** que
+atrasa/desvia (não só o fato técnico genérico), e "desvio" sempre é explicado
+como pousar numa **pista ou aeroporto diferente** do planejado. Ao adicionar
+um `headline_kind` novo, manter essa linha — "o seu voo pode..." em vez de
+"há chance de...".
+
+### Slide explicativo: contextualização + fonte DECEA (aplicado 2026-08-24)
+
+O slide EXPLICATIVO agora abre com um parágrafo de contexto
+(`ExplicativoContent.contexto`, renderizado em `slide.py` logo após a linha
+divisória, antes de "O QUE ACONTECEU") que situa a notícia e deixa claro que
+a conta traz dados das fontes oficiais do DECEA (REDEMET/AISWEB) — pedido do
+usuário depois de ver o carrossel ir direto pros blocos técnicos sem
+contextualizar nada antes. `content.py` gera esse texto automaticamente por
+post (menciona a cidade/ICAO); `fallback_content.py` usa uma versão fixa
+adaptada ao tom educativo. Campo opcional (`None` = nenhum parágrafo extra),
+mas hoje é sempre preenchido nos dois lugares que constroem `PostContent`.
+
+### Fontes empacotadas no repo, não do sistema (correção de bug, 2026-08-24)
+
+**Incidente**: o primeiro post gerado pela automação na nuvem (GitHub
+Actions, runner Ubuntu) saiu com os acentos quebrados ("DURAÇÃO" virou
+"DURA▯▯O", "aeródromo" virou "aer▯dromo" etc.). Causa: `slide.py` apontava
+`FONT_DIR` pra `C:\Windows\Fonts`, que só existe no PC Windows do usuário —
+no runner Linux o carregamento falhava silenciosamente (`try/except OSError`)
+e caía no fallback bitmap do Pillow (`ImageFont.load_default`), que não sabe
+desenhar caracteres acentuados.
+
+**Correção**: fontes de verdade (SIL Open Font License) agora ficam
+versionadas em `automation/assets/fonts/` — `Inter[opsz,wght].ttf` (sans,
+CAPA), `Lora[wght].ttf` (serif, EXPLICATIVO) e `RobotoMono[wght].ttf` (mono,
+card de registro bruto). São fontes variáveis; `slide.py._font(role, size)`
+carrega o arquivo certo e ajusta o eixo de peso (`set_variation_by_axes`) por
+"papel" (`sans`, `sans_bold`, `serif`, `serif_bold`, `mono`) em vez de um
+arquivo por peso. Isso funciona identicamente local (Windows) e na automação
+(Linux) — não depende mais de fonte nenhuma do sistema operacional. O
+`try/except` que mascarava esse tipo de falha foi removido de propósito: se o
+arquivo de fonte sumir do repo, agora quebra alto (erro claro), em vez de
+degradar silenciosamente pra um visual quebrado como aconteceu aqui.
+Não voltar a apontar fontes pra um caminho do sistema operacional.
 
 ## Biblioteca de fotos reais por aeroporto
 
@@ -271,6 +298,13 @@ maior em vez disso.
 ### Segredos necessários no GitHub (Settings → Secrets and variables → Actions)
 
 `INSTAGRAM_TOKEN`, `REDEMET_API_KEY`, `AISWEB_API_KEY`, `AISWEB_API_PASS` —
-os mesmos valores do `.env` local. Configuração manual (não há `gh` CLI
-instalado nesta máquina pra automatizar isso); ver instruções que o
-assistente passou ao usuário em 2026-08-23.
+os mesmos valores do `.env` local. `gh` CLI foi instalado nesta máquina em
+2026-08-24 (`winget install --id GitHub.cli`, autenticado como
+PabloEduardo89) — dá pra usar `gh secret set NOME --repo
+PabloEduardo89/aviso-aereo` direto do terminal a partir de agora, sem precisar
+colar segredo em nenhum arquivo. **Cuidado ao digitar o nome do secret**: um
+erro de digitação (`INTAGRAM_TOKEN` em vez de `INSTAGRAM_TOKEN`) foi a causa
+raiz de todas as execuções agendadas falharem entre o lançamento (2026-08-23)
+e a correção (2026-08-24) — o workflow lia a env var vazia e abortava. `gh
+secret list --repo PabloEduardo89/aviso-aereo` é a forma rápida de conferir
+os nomes exatos cadastrados.

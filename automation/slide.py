@@ -32,23 +32,35 @@ COLOR_WHITE_MUTED = "#C9C9C9"
 COLOR_CARD_BG = "#F1F0EC"
 COLOR_LINE = "#DDDDDD"
 
-FONT_DIR = r"C:\Windows\Fonts"
-FONT_CONDENSED_BOLD = os.path.join(FONT_DIR, "ARIALNB.TTF")
-FONT_CONDENSED = os.path.join(FONT_DIR, "ARIALN.TTF")
-FONT_SANS_BOLD = os.path.join(FONT_DIR, "segoeuib.ttf")
-FONT_SANS = os.path.join(FONT_DIR, "segoeui.ttf")
-FONT_SERIF = os.path.join(FONT_DIR, "georgia.ttf")
-FONT_SERIF_BOLD = os.path.join(FONT_DIR, "georgiab.ttf")
-FONT_MONO = os.path.join(FONT_DIR, "consola.ttf")
+# Fontes empacotadas no repo (SIL OFL, assets/fonts/) em vez de fontes do
+# sistema — C:\Windows\Fonts só existe no PC Windows do usuário; o runner do
+# GitHub Actions é Linux e não tem essas fontes. Usar arquivos do repo garante
+# o mesmo resultado visual local e na automação (lição do incidente de
+# 2026-08-24: sem isso, acentos saíam quebrados nos posts gerados pela nuvem).
+FONT_DIR = os.path.join(os.path.dirname(__file__), "assets", "fonts")
+_FONT_FILES = {
+    "sans": os.path.join(FONT_DIR, "Inter[opsz,wght].ttf"),
+    "serif": os.path.join(FONT_DIR, "Lora[wght].ttf"),
+    "mono": os.path.join(FONT_DIR, "RobotoMono[wght].ttf"),
+}
+# fontes variáveis — cada "papel" escolhe a família e o eixo de peso (e óptico,
+# no caso da Inter) em vez de precisar de um arquivo por peso
+_FONT_AXES = {
+    "sans_bold": ("sans", [32, 700]),
+    "sans": ("sans", [16, 400]),
+    "serif_bold": ("serif", [700]),
+    "serif": ("serif", [400]),
+    "mono": ("mono", [400]),
+}
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 
 
-def _font(path, size):
-    try:
-        return ImageFont.truetype(path, size)
-    except OSError:
-        return ImageFont.load_default(size=size)
+def _font(role, size):
+    family, axes = _FONT_AXES[role]
+    font = ImageFont.truetype(_FONT_FILES[family], size)
+    font.set_variation_by_axes(axes)
+    return font
 
 
 def _accent(post: PostContent) -> str:
@@ -124,7 +136,7 @@ def render_capa_slide(post: PostContent, out_path: str | None = None) -> str:
     max_w = WIDTH - 2 * pad
 
     # selo pequeno da conta, canto superior esquerdo (discreto, como o logo do G1)
-    font_brand = _font(FONT_SANS_BOLD, 26)
+    font_brand = _font("sans_bold", 26)
     brand_text = "@AVISOAEREO"
     brand_w = draw.textlength(brand_text, font=font_brand) + 36
     draw.rounded_rectangle([(pad - 20, 44), (pad - 20 + brand_w, 44 + 50)], radius=25, fill=(0, 0, 0, 140))
@@ -133,20 +145,20 @@ def render_capa_slide(post: PostContent, out_path: str | None = None) -> str:
     # pré-calcula todo o bloco de texto de baixo pra cima, pra ancorar no rodapé
     # kicker = código + UF (informação nova, já que o título abaixo repete o
     # nome da cidade e a categoria do aviso) — a cor da etiqueta ainda indica a severidade
-    font_kicker = _font(FONT_SANS_BOLD, 26)
+    font_kicker = _font("sans_bold", 26)
     kicker_text = post.kicker_text or f"{post.icao} · {post.uf}"
     kicker_h = 46
 
-    font_title, title_lines = _fit_title(draw, post.cover_title, FONT_SANS_BOLD, max_w,
+    font_title, title_lines = _fit_title(draw, post.cover_title, "sans_bold", max_w,
                                           max_lines=3, start_size=72, min_size=42)
     title_line_h = font_title.size + 12
 
-    font_sub = _font(FONT_SANS, 30)
+    font_sub = _font("sans", 30)
     subtitle_lines = _wrap_text(draw, post.cover_subtitle, font_sub, max_w)[:2] if post.cover_subtitle else []
     sub_line_h = 38
 
     credit_text = f"Foto: {photo_author}" if photo_author else None
-    font_credit = _font(FONT_SANS, 20)
+    font_credit = _font("sans", 20)
 
     block_h = kicker_h + 22 + len(title_lines) * title_line_h
     if subtitle_lines:
@@ -198,7 +210,7 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
     y = MARGIN
 
     # selo com o nome da conta em destaque colorido
-    font_badge = _font(FONT_SANS_BOLD, 26)
+    font_badge = _font("sans_bold", 26)
     badge_text = "@AVISOAEREO"
     badge_w = draw.textlength(badge_text, font=font_badge) + 48
     draw.rounded_rectangle([(MARGIN, y), (MARGIN + badge_w, y + 56)], radius=28, fill=accent)
@@ -206,7 +218,7 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
     y += 56 + 44
 
     # subtítulo/categoria — serifado, em vermelho
-    font_subtitulo = _font(FONT_SERIF_BOLD, 44)
+    font_subtitulo = _font("serif_bold", 44)
     for line in _wrap_text(draw, e.subtitulo, font_subtitulo, max_w):
         draw.text((MARGIN, y), line, font=font_subtitulo, fill=accent)
         y += 54
@@ -215,8 +227,18 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
     draw.line([(MARGIN, y), (WIDTH - MARGIN, y)], fill=COLOR_LINE, width=2)
     y += 36
 
-    font_heading = _font(FONT_SERIF_BOLD, 30)
-    font_body = _font(FONT_SERIF, 30)
+    # parágrafo de contextualização — situa a notícia e deixa claro que a conta
+    # traz dados das fontes oficiais do DECEA, antes de entrar nos blocos
+    # "o que aconteceu / o que significa" (pedido do usuário, 2026-08-24)
+    if e.contexto:
+        font_contexto = _font("sans", 24)
+        for line in _wrap_text(draw, e.contexto, font_contexto, max_w):
+            draw.text((MARGIN, y), line, font=font_contexto, fill="#5A5A5A")
+            y += 32
+        y += 30
+
+    font_heading = _font("serif_bold", 30)
+    font_body = _font("serif", 30)
     body_line_h = 40
 
     def draw_block(heading, body_text):
@@ -240,11 +262,11 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
         card_h = 190
         card_top = HEIGHT - MARGIN - card_h
         if card_top > y + 20:
-            font_label = _font(FONT_SANS_BOLD, 22)
+            font_label = _font("sans_bold", 22)
             draw.text((MARGIN, card_top - 34), e.raw_snippet_label, font=font_label, fill="#8A8A8A")
             draw.rounded_rectangle([(MARGIN, card_top), (WIDTH - MARGIN, HEIGHT - MARGIN)],
                                     radius=20, fill=COLOR_CARD_BG)
-            font_mono = _font(FONT_MONO, 25)
+            font_mono = _font("mono", 25)
             my = card_top + 28
             for line in _wrap_text(draw, e.raw_snippet, font_mono, max_w - 48)[:5]:
                 draw.text((MARGIN + 24, my), line, font=font_mono, fill="#333333")

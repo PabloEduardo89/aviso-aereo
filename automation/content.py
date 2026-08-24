@@ -65,32 +65,40 @@ _ILLUSTRATION_BY_KIND = {
     "navaid_us": "navaid",
 }
 
-# texto de "o que isso significa" pro slide explicativo — um por headline_kind
+# texto de "o que isso significa" pro slide explicativo — um por headline_kind.
+# Ênfase explícita em VOO (o que muda pro passageiro), não só o fato técnico —
+# e "desvio" sempre explicado como pousar em pista/aeroporto diferente do
+# planejado (pedido do usuário, 2026-08-24 — antes o texto era genérico
+# demais, ex.: "chance real de atraso, reprogramação ou desvio").
 _IMPACT_TEXT = {
-    "rwy_closed": "Voos que pousariam ou decolariam por essa pista precisam usar uma pista alternativa "
-        "ou aeroportos próximos — há chance real de atraso, reprogramação ou desvio.",
-    "twr_closed": "Sem torre de controle ativa, a operação do aeroporto pode ficar mais lenta ou ser "
-        "suspensa temporariamente.",
-    "windshear": "Mudança brusca de vento perto do solo é um dos riscos mais sérios na aproximação — "
-        "pilotos podem arremeter (ir para uma segunda volta) ou esperar a condição melhorar.",
-    "thunderstorm": "Trovoada perto do aeroporto costuma causar espera no ar, desvio de rota ou atraso "
-        "na decolagem por segurança.",
-    "severe_wx": "Fenômeno meteorológico severo costuma causar espera no ar, desvio de rota ou atraso "
-        "na decolagem por segurança.",
-    "convective": "Nuvens de tempestade (cumulonimbus) perto do aeroporto costumam causar espera no ar, "
-        "desvio de rota ou atraso na decolagem por segurança.",
-    "freezing": "Chuva congelante exige degelo da aeronave e da pista antes da operação — um processo "
-        "que atrasa pousos e decolagens.",
+    "rwy_closed": "Se o seu voo usaria essa pista, ele pode atrasar, ser remarcado para outro horário "
+        "ou até pousar numa pista ou aeroporto diferente do planejado (desvio) enquanto essa pista "
+        "estiver fechada.",
+    "twr_closed": "Sem torre de controle ativa, os voos daquele aeroporto podem atrasar ou ficar "
+        "temporariamente suspensos até o serviço ser retomado.",
+    "windshear": "Na aproximação, o piloto pode precisar arremeter — abortar o pouso e tentar de novo — "
+        "ou esperar a condição melhorar antes de tentar pousar; isso atrasa o seu voo, mas é uma "
+        "medida de segurança.",
+    "thunderstorm": "Voos que passariam perto do aeroporto agora podem esperar no ar, ser desviados de "
+        "rota (pousar em outro aeroporto) ou ter a decolagem atrasada por segurança.",
+    "severe_wx": "Fenômeno meteorológico severo costuma atrasar a decolagem, fazer o voo esperar no ar "
+        "ou até ser desviado para outro aeroporto por segurança.",
+    "convective": "Nuvens de tempestade (cumulonimbus) perto do aeroporto costumam atrasar decolagens, "
+        "fazer voos esperarem no ar ou até serem desviados para outro aeroporto até a condição melhorar.",
+    "freezing": "Antes de decolar, a aeronave e a pista precisam passar por degelo — um processo que "
+        "atrasa o seu voo.",
     "low_vis": "Com visibilidade tão baixa, só aeronaves e pilotos habilitados a pousos por instrumento "
-        "em condição severa conseguem operar — os demais voos esperam ou desviam.",
+        "em condição severa conseguem operar — os demais voos esperam no ar ou são desviados para "
+        "outro aeroporto.",
     "obscured": "Com o céu obscurecido dessa forma, só aeronaves e pilotos habilitados a pousos por "
-        "instrumento em condição severa conseguem operar — os demais voos esperam ou desviam.",
-    "low_ceiling": "Nuvens muito baixas dificultam a aproximação visual — pilotos dependem mais dos "
-        "instrumentos, e alguns voos podem atrasar ou desviar.",
-    "strong_wind": "Vento forte, especialmente com rajadas, pode forçar arremetidas (segunda volta) ou "
-        "atrasos até a condição melhorar.",
-    "navaid_us": "Sem esse auxílio, pilotos dependem de outro tipo de aproximação — geralmente com "
-        "mínimos mais altos — o que pode causar mais atrasos e desvios que o normal em dias de tempo ruim.",
+        "instrumento em condição severa conseguem operar — os demais voos esperam no ar ou são "
+        "desviados para outro aeroporto.",
+    "low_ceiling": "Nuvens muito baixas dificultam a aproximação visual — alguns voos podem atrasar ou "
+        "ser desviados para outro aeroporto até o teto subir.",
+    "strong_wind": "Vento forte, especialmente com rajadas, pode forçar o piloto a arremeter (tentar o "
+        "pouso de novo) ou atrasar o voo até a condição melhorar.",
+    "navaid_us": "Sem esse auxílio, os pilotos dependem de outro tipo de aproximação — geralmente mais "
+        "exigente — o que aumenta a chance de atraso ou desvio do seu voo em dias de tempo ruim.",
 }
 
 _NAV_AID_NAME = {
@@ -220,6 +228,7 @@ class ExplicativoContent:
     heading_1: str = "O QUE ACONTECEU:"      # sobrescrito pelo fallback_content.py (posts educativos)
     heading_2: str = "O QUE ISSO SIGNIFICA:"
     raw_snippet_label: str = "REGISTRO BRUTO (METAR/NOTAM)"
+    contexto: str | None = None  # parágrafo de abertura — situa a notícia e cita a fonte (DECEA)
 
 
 @dataclass
@@ -325,11 +334,22 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
     severity = "alto" if headline_kind in _HIGH_SEVERITY_KINDS else "atenção"
     updated_label = _metar_updated_label(metar) if metar else "Aviso NOTAM ativo"
 
-    cover_title = f"{_HEADLINE_LABEL_SENTENCE[headline_kind]} em {airport['city']}"
+    # título de capa: sempre com "Aeroporto de {cidade}" e terminando na
+    # consequência prática ("...pode atrasar ou alterar voos") — as duas
+    # palavras-chave que geram urgência pra quem vê o post parar pra ler
+    # (pedido explícito do usuário, 2026-08-24; exemplo dado: "Aeroporto de
+    # Natal: Risco de Tempestade pode atrasar / alterar voos").
+    problema = _HEADLINE_LABEL_SENTENCE[headline_kind][0].lower() + _HEADLINE_LABEL_SENTENCE[headline_kind][1:]
     if causa:
-        cover_title += f" {causa}"
+        problema += f" {causa}"
+    cover_title = f"Aeroporto de {airport['city']}: {problema} pode atrasar ou alterar voos"
 
     background_category = "weather" if headline_kind in WEATHER_KINDS else _ILLUSTRATION_BY_KIND[headline_kind]
+
+    contexto = (
+        f"A AvisoAereo acompanha em tempo real os boletins oficiais do DECEA (REDEMET/AISWEB) "
+        f"nos principais aeroportos do Brasil. Agora é a vez do Aeroporto de {airport['city']} ({icao}):"
+    )
 
     explicativo = ExplicativoContent(
         subtitulo=f"{airport['city']} — {icao}",
@@ -337,6 +357,7 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
         o_que_significa=_IMPACT_TEXT.get(headline_kind, ""),
         duracao_prevista=duracao_prevista,
         raw_snippet=raw_snippet,
+        contexto=contexto,
     )
 
     # o "o que isso significa" sempre aparece — na legenda, e também no slide

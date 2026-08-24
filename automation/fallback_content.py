@@ -217,6 +217,8 @@ def build_fallback_post(topic: Topic) -> PostContent:
         heading_1=topic.heading_1,
         heading_2=topic.heading_2,
         raw_snippet_label=topic.raw_snippet_label,
+        contexto="A AvisoAereo publica atualizações de aeroportos brasileiros direto das fontes oficiais "
+                 "do DECEA (REDEMET/AISWEB). Sem nenhum alerta ativo agora, aproveitamos para explicar:",
     )
 
     caption_lines = [
