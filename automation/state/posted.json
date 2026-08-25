@@ -47,6 +47,10 @@
     "media_id": "17876002509548439",
     "posted_at": "2026-08-25T18:56:05.703799+00:00"
   },
+  "SBBV|weather|thunderstorm|2026-08-25": {
+    "media_id": "18145700698538850",
+    "posted_at": "2026-08-25T23:28:00.581599+00:00"
+  },
   "SBCF|notam|12659857": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -206,7 +210,7 @@
   "_meta": {
     "fallback_topic_index": 7,
     "last_fallback_at": "2026-08-25T20:33:01.117861+00:00",
-    "last_post_at": "2026-08-25T22:43:53.883252+00:00"
+    "last_post_at": "2026-08-25T23:28:00.581599+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
