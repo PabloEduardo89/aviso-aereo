@@ -55,6 +55,10 @@
     "media_id": "18061538096787742",
     "posted_at": "2026-08-25T01:23:37.773948+00:00"
   },
+  "SBCF|weather|convective|2026-08-25": {
+    "media_id": "18091997837382122",
+    "posted_at": "2026-08-25T19:41:46.534577+00:00"
+  },
   "SBCF|weather|thunderstorm|2026-08-23": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -184,9 +188,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 5,
+    "fallback_topic_index": 6,
     "last_fallback_at": "2026-08-25T14:02:46.306021+00:00",
-    "last_post_at": "2026-08-25T18:56:05.703799+00:00"
+    "last_post_at": "2026-08-25T19:41:46.534577+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
