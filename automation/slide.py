@@ -198,10 +198,11 @@ def render_capa_slide(post: PostContent, out_path: str | None = None) -> str:
 
 # --------------------------------------------------------- EXPLICATIVO ----
 
-def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> str | None:
-    if post.explicativo is None:
+def render_explicativo_slide(post: PostContent, explicativo=None, index: int = 2,
+                              out_path: str | None = None) -> str | None:
+    e = explicativo if explicativo is not None else post.explicativo
+    if e is None:
         return None
-    e = post.explicativo
     accent = _accent(post)
 
     img = Image.new("RGB", (WIDTH, HEIGHT), COLOR_WHITE)
@@ -227,31 +228,51 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
     draw.line([(MARGIN, y), (WIDTH - MARGIN, y)], fill=COLOR_LINE, width=2)
     y += 36
 
+    # fonte maior + conteúdo centralizado verticalmente quando o slide traz só
+    # 1 bloco de texto (heading_1/o_que_aconteceu, sem heading_2 nem duração) —
+    # evita sobrar muito espaço em branco embaixo, caso dos 2 slides
+    # explicativos do fallback educativo (antes só existia 1 slide com os 2
+    # blocos juntos; regra atualizada 2026-08-24, ver fallback_content.py)
+    single_block = not e.o_que_significa and not e.duracao_prevista
+
+    if single_block:
+        font_contexto, contexto_line_h = _font("sans", 28), 38
+        font_heading, font_body, body_line_h = _font("serif_bold", 38), _font("serif", 38), 52
+    else:
+        font_contexto, contexto_line_h = _font("sans", 24), 32
+        font_heading, font_body, body_line_h = _font("serif_bold", 30), _font("serif", 30), 40
+
     # parágrafo de contextualização — situa a notícia e deixa claro que a conta
     # traz dados das fontes oficiais do DECEA, antes de entrar nos blocos
     # "o que aconteceu / o que significa" (pedido do usuário, 2026-08-24)
-    if e.contexto:
-        font_contexto = _font("sans", 24)
-        for line in _wrap_text(draw, e.contexto, font_contexto, max_w):
+    contexto_lines = _wrap_text(draw, e.contexto, font_contexto, max_w) if e.contexto else []
+    body_1_lines = _wrap_text(draw, e.o_que_aconteceu, font_body, max_w)
+
+    if single_block:
+        content_h = (len(contexto_lines) * contexto_line_h + 30 if contexto_lines else 0) \
+            + body_line_h + len(body_1_lines) * body_line_h
+        bottom_limit = HEIGHT - MARGIN - (190 + 34 + 20 if e.raw_snippet else 0)
+        y += max(0, (bottom_limit - y - content_h) // 2)
+
+    if contexto_lines:
+        for line in contexto_lines:
             draw.text((MARGIN, y), line, font=font_contexto, fill="#5A5A5A")
-            y += 32
+            y += contexto_line_h
         y += 30
 
-    font_heading = _font("serif_bold", 30)
-    font_body = _font("serif", 30)
-    body_line_h = 40
-
-    def draw_block(heading, body_text):
+    def draw_block(heading, body_text, lines=None):
         nonlocal y
         draw.text((MARGIN, y), heading, font=font_heading, fill="#111111")
         y += body_line_h
-        for line in _wrap_text(draw, body_text, font_body, max_w):
+        for line in (lines if lines is not None else _wrap_text(draw, body_text, font_body, max_w)):
             draw.text((MARGIN, y), line, font=font_body, fill="#222222")
             y += body_line_h
         y += 26
 
-    draw_block(e.heading_1, e.o_que_aconteceu)
-    draw_block(e.heading_2, e.o_que_significa)
+    draw_block(e.heading_1, e.o_que_aconteceu, body_1_lines)
+    # bloco 2 é opcional — pulado quando o slide traz só um bloco de texto
+    if e.o_que_significa:
+        draw_block(e.heading_2, e.o_que_significa)
     if e.duracao_prevista:
         draw_block("DURAÇÃO PREVISTA:", e.duracao_prevista)
 
@@ -274,15 +295,23 @@ def render_explicativo_slide(post: PostContent, out_path: str | None = None) -> 
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     if out_path is None:
-        out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_2_explicativo.png")
+        out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_{index}_explicativo.png")
     img.save(out_path, "PNG")
     return out_path
 
 
 def render_post_slides(post: PostContent) -> list:
-    """Gera todos os slides do post: capa sempre, explicativo só quando necessário."""
+    """Gera todos os slides do post: capa sempre, depois 1 slide explicativo (regra
+    geral) ou N slides explicativos quando `post.explicativo_slides` estiver
+    preenchido (hoje só o fallback educativo usa isso — capa + 2 explicativos = 3
+    slides, ver fallback_content.py)."""
     paths = [render_capa_slide(post)]
-    if post.needs_explicativo:
+    if post.explicativo_slides:
+        for i, explicativo in enumerate(post.explicativo_slides, start=2):
+            path = render_explicativo_slide(post, explicativo, index=i)
+            if path:
+                paths.append(path)
+    elif post.needs_explicativo:
         path = render_explicativo_slide(post)
         if path:
             paths.append(path)

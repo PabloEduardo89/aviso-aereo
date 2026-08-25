@@ -1,8 +1,13 @@
 """
-Conteúdo educativo de fallback — carrossel curto que run_cycle.py publica só
-quando NÃO há nenhum aviso real ativo em nenhum aeroporto monitorado E já faz
-tempo (MIN_FALLBACK_INTERVAL_SECONDS) desde o último post, pra conta nunca
-ficar muda por muitas horas seguidas mesmo em dias calmos.
+Conteúdo educativo de fallback — carrossel de 3 slides (capa + 2 explicativos)
+que run_cycle.py publica OBRIGATORIAMENTE a cada MIN_FALLBACK_INTERVAL_SECONDS
+(4h), independente de haver ou não avisos reais na mesma execução (regra
+atualizada em 2026-08-24 — antes só saía quando não havia nenhum candidato
+real; o usuário pediu que a curiosidade tenha um ritmo garantido próprio, sem
+depender de quão calmos os aeroportos estão). Continua reaproveitando o slide
+CAPA e a estrutura do EXPLICATIVO (ver content.py/slide.py); a diferença é que
+os dois blocos que antes cabiam num só slide explicativo agora viram um slide
+cada (`explicativo_slides` em content.PostContent).
 
 Não é uma notícia/alerta — é conteúdo educativo rotativo sobre regras, códigos
 e curiosidades da aviação (aprovado pelo usuário em 2026-08-23), com visual
@@ -230,22 +235,30 @@ TOPICS = [
 
 
 def build_fallback_post(topic: Topic) -> PostContent:
-    """Monta o PostContent de um tópico educativo — mesma estrutura de carrossel
-    (capa + explicativo) dos posts de aviso real, mas com severity="informativo"
-    (cor azul, ver slide.py) pra nunca ser confundido com um alerta de verdade."""
+    """Monta o PostContent de um tópico educativo — carrossel de 3 slides (capa +
+    2 explicativos, um bloco por slide — regra fixa desde 2026-08-24, pedido do
+    usuário) com severity="informativo" (cor azul, ver slide.py) pra nunca ser
+    confundido com um alerta de verdade."""
     hoje = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    explicativo = ExplicativoContent(
+    explicativo_1 = ExplicativoContent(
         subtitulo=topic.kicker_text.capitalize(),
         o_que_aconteceu=topic.body_1,
-        o_que_significa=topic.body_2,
+        o_que_significa="",  # bloco 2 fica pro próximo slide — ver render_explicativo_slide (slide.py)
         duracao_prevista=None,
-        raw_snippet=topic.raw_snippet,
+        raw_snippet="",
         heading_1=topic.heading_1,
-        heading_2=topic.heading_2,
-        raw_snippet_label=topic.raw_snippet_label,
         contexto="A AvisoAereo publica atualizações de aeroportos brasileiros direto das fontes oficiais "
                  "do DECEA (REDEMET/AISWEB). Sem nenhum alerta ativo agora, aproveitamos para explicar:",
+    )
+    explicativo_2 = ExplicativoContent(
+        subtitulo=topic.kicker_text.capitalize(),
+        o_que_aconteceu=topic.body_2,
+        o_que_significa="",
+        duracao_prevista=None,
+        raw_snippet=topic.raw_snippet,
+        heading_1=topic.heading_2,
+        raw_snippet_label=topic.raw_snippet_label,
     )
 
     caption_lines = [
@@ -275,9 +288,10 @@ def build_fallback_post(topic: Topic) -> PostContent:
         cover_subtitle=None,
         background_category="navaid",  # só usado se não houver foto genérica da categoria (ver backgrounds.py)
         needs_explicativo=True,
-        explicativo=explicativo,
+        explicativo=None,
         dedup_key=f"fallback|{topic.slug}|{hoje}",
         kicker_text=topic.kicker_text,
+        explicativo_slides=[explicativo_1, explicativo_2],
     )
 
 

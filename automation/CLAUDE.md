@@ -53,16 +53,24 @@ aparecer em pelo menos um destes dois lugares — os dois é ainda melhor:
 Nunca publicar um post só com o fato técnico cru, sem essa camada de
 explicação em linguagem simples.
 
-### Título de capa com "Aeroporto" + consequência (aplicado 2026-08-24)
+### Título de capa variado, sorteado por template (atualizado 2026-08-24)
 
-`cover_title` (content.py, `_build_one_post`) segue o formato fixo:
-`"Aeroporto de {cidade}: {problema} pode atrasar ou alterar voos"` — ex.:
-"Aeroporto de Natal: risco de tempestade pode atrasar ou alterar voos". As
-duas palavras-chave ("Aeroporto" e "atrasar/alterar voos") sempre aparecem no
-título da capa, por pedido explícito do usuário (exemplo que ele deu:
-"Aeroporto de Natal: Risco de Tempestade pode atrasar / alterar voos") — é o
-que gera urgência pra parar e ler o post. Não voltar ao formato antigo
-("{categoria} em {cidade}") sem o usuário pedir.
+**Superado pela regra abaixo** — ver histórico: a versão anterior desta seção
+fixava `cover_title` sempre no formato `"Aeroporto de {cidade}: {problema}
+pode atrasar ou alterar voos"`. O usuário revisou o feed real, viu um "título
+padrão" repetido demais, e pediu criatividade: `aeroporto`, `cancelamentos`,
+`atrasos`, `alteração de voos` etc. são **exemplos** de palavra-chave pra
+gerar urgência, não uma regra obrigatória em todo post — só "aeroporto" pode
+seguir aparecendo com mais frequência que as outras, mas também não em todos.
+
+`_pick_cover_title` (content.py) sorteia (`random.choice`) um template de
+`_TITLE_TEMPLATES["alto"]` ou `_TITLE_TEMPLATES["atenção"]` (por severidade)
+a cada post — variam a estrutura da frase (às vezes começa pela cidade, às
+vezes pelo problema, às vezes é pergunta/chamada direta) em vez de repetir
+sempre "Aeroporto de {cidade}: ...". Pra adicionar variedade nova, só
+acrescentar um template na lista certa (usa `{city}`, `{problema}` e
+`{Problema}` — versão com primeira letra maiúscula, pra frases que começam
+pelo problema).
 
 ### `_IMPACT_TEXT` com ênfase em VOO (aplicado 2026-08-24)
 
@@ -267,20 +275,45 @@ Dois modos, pra dois momentos diferentes:
   formato do `dedup_key` mudar de novo no futuro, o registro precisa ser
   refeito com a chave nova (senão perde efeito e volta a dar rajada).
 
-### Fallback educativo (regra fixa, decidido 2026-08-23)
+### Fallback educativo (atualizado 2026-08-24 — agora obrigatório, não condicional)
 
-Quando NENHUM aeroporto monitorado tem aviso real ativo, a conta ficava muda
-naquele ciclo. Pra evitar isso, `run_cycle.py` (`maybe_build_fallback`) publica
-um carrossel educativo de `fallback_content.py` — mas só quando **não há
-candidato real nesta execução E já se passaram
-`MIN_FALLBACK_INTERVAL_SECONDS` (4h) desde o último post, real ou fallback**
-(`_meta.last_post_at` em `state/posted.json`, via `get_meta`/`set_meta` de
-`state.py`). O intervalo é propositalmente bem mais espaçado que "1 por hora"
-— o usuário pediu isso inicialmente, mas foi alertado que rajada diária de
-conteúdo genérico competiria com a cota de ~25 posts/24h da API e criaria um
-padrão repetitivo (mesmo tipo de post, todo dia) — decidiu por um intervalo
-maior em vez disso.
+**Superado em parte — ver histórico**: até 2026-08-24 esse post só saía
+quando NENHUM aeroporto monitorado tinha aviso real ativo na execução (senão
+a conta ficava muda naquele ciclo). O usuário pediu pra mudar: agora o post
+educativo tem ritmo **próprio e garantido**, independente de haver posts reais
+na mesma execução ou não — não é mais "só quando não há nada real pra
+postar".
 
+- **Obrigatório a cada `MIN_FALLBACK_INTERVAL_SECONDS` (4h)**, contado desde o
+  último post EDUCATIVO especificamente (`_meta.last_fallback_at` em
+  `state/posted.json`, separado de `_meta.last_post_at` que segue existindo
+  mas agora só serve de registro geral) — posts reais publicados no meio não
+  atrasam esse relógio. `run_cycle.run()` chama `maybe_build_fallback` sempre
+  (não só quando `candidates` está vazio) e, se for hora, insere o educativo
+  na FRENTE da lista de candidatos daquela execução (garante que ele entra
+  dentro do `MAX_POSTS_PER_RUN`, mesmo em dia cheio de avisos reais). O
+  intervalo de 4h em si não mudou — continua bem mais espaçado que "1 por
+  hora" pra não competir com a cota de ~25 posts/24h da API do Instagram nem
+  criar um padrão repetitivo que sistemas antispam da Meta possam sinalizar
+  (decidido 2026-08-23).
+- **Carrossel de 3 slides, não mais 2** (regra nova, 2026-08-24, pedido
+  explícito do usuário: "precisam trazer um carrossel com três slides, sendo
+  o primeiro para capa... e dois explicativos"): capa (igual sempre foi) +
+  UM slide explicativo por bloco de conteúdo (`Topic.heading_1`/`body_1` no
+  slide 2, `Topic.heading_2`/`body_2` no slide 3 — antes os dois cabiam
+  juntos num único slide explicativo). Implementado via
+  `PostContent.explicativo_slides` (content.py) — uma lista de
+  `ExplicativoContent`, cada um com só 1 bloco de texto (`o_que_significa=""`
+  pra pular o 2º bloco, ver `render_explicativo_slide` em slide.py); quando
+  presente, `slide.render_post_slides` ignora o campo singular `explicativo`
+  e gera 1 imagem por item da lista. Os posts de aviso real (content.py,
+  `_build_one_post`) **não usam esse campo** — continuam com capa + 1 slide
+  explicativo de 2 blocos, como sempre (regra de carrossel mínimo de 2 slides
+  do topo deste arquivo não mudou pra eles). Quando o slide explicativo tem só
+  1 bloco, `slide.py` aumenta a fonte e centraliza o texto verticalmente
+  (`single_block` em `render_explicativo_slide`) pra não sobrar espaço em
+  branco — não mexer nisso pros posts de 2 blocos (real), que continuam
+  ancorados no topo como sempre.
 - **Conteúdo**: rotação fixa de tópicos (`fallback_content.TOPICS`) nas 6
   categorias pedidas pelo usuário — regras/leis/regulamentos da aviação
   (geral e comercial), significado de códigos de aeroporto (IATA/ICAO,
@@ -292,8 +325,7 @@ maior em vez disso.
   qualquer um (`_meta.fallback_topic_index`).
 - **Nunca é confundido com um alerta real**: `severity="informativo"` usa cor
   azul (`COLOR_ACCENT_INFO` em `slide.py`), diferente do vermelho/âmbar dos
-  avisos de verdade — mesmo padrão de carrossel (capa + explicativo), mas
-  visualmente distinto de propósito.
+  avisos de verdade — visualmente distinto de propósito.
 - Se algum dia adicionar tópico novo, só acrescentar em `TOPICS` — a rotação
   e o dedup (`dedup_key = fallback|<slug>|<data>`) já lidam com isso sozinhos.
 

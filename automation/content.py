@@ -3,6 +3,7 @@ Etapa 3 (parte 1) — tradução do resultado da etapa 2 (rules.py) em portuguê
 natural, pronto pra virar slide/legenda de post. Não faz nenhuma chamada de
 rede: recebe os dados já buscados (fetch_data) e avaliados (rules).
 """
+import random
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -100,6 +101,41 @@ _IMPACT_TEXT = {
     "navaid_us": "Sem esse auxílio, os pilotos dependem de outro tipo de aproximação — geralmente mais "
         "exigente — o que aumenta a chance de atraso ou desvio do seu voo em dias de tempo ruim.",
 }
+
+# títulos de capa variados — "aeroporto", "atraso", "cancelamento" etc. são
+# EXEMPLOS de palavra-chave, não uma regra fixa por post (pedido do usuário,
+# 2026-08-24, depois de notar um "título padrão" repetido demais no feed). Um
+# template é sorteado por post; "aeroporto" aparece em parte deles (pode ser
+# mais frequente que as outras palavras-chave), mas não em todos. Ver
+# `_pick_cover_title`.
+_TITLE_TEMPLATES = {
+    "alto": [
+        "Aeroporto de {city}: {problema} pode causar atraso ou cancelamento de voos",
+        "{Problema} em {city} — passageiros podem ter voo atrasado ou desviado",
+        "Voos para {city} podem atrasar ou ser cancelados: {problema}",
+        "Alerta no aeroporto de {city}: {problema} pode alterar seu voo",
+        "{city} enfrenta {problema} — atraso ou desvio de voo é o risco agora",
+        "Passageiro de {city}, atenção: {problema} ameaça atrasar ou cancelar seu voo",
+        "{Problema} no aeroporto de {city}: chance real de atraso ou desvio",
+        "Vai voar para {city}? {problema} pode atrasar ou cancelar seu voo",
+    ],
+    "atenção": [
+        "Aeroporto de {city}: {problema} pode atrasar ou alterar voos",
+        "{Problema} em {city} pode atrasar seu voo",
+        "Voos para {city} podem atrasar: {problema}",
+        "Fique de olho: {problema} afeta o aeroporto de {city}",
+        "{city}: {problema} pode mudar o horário do seu voo",
+        "Aeroporto de {city} sob {problema} — possível atraso nos voos",
+        "Passageiro de {city}, atenção: {problema} pode alterar seu voo",
+    ],
+}
+
+
+def _pick_cover_title(city: str, problema: str, severity: str) -> str:
+    template = random.choice(_TITLE_TEMPLATES[severity])
+    problema_cap = problema[0].upper() + problema[1:]
+    return template.format(city=city, problema=problema, Problema=problema_cap)
+
 
 _NAV_AID_NAME = {
     "ILS": "O ILS (sistema de pouso por instrumentos)",
@@ -249,6 +285,9 @@ class PostContent:
     explicativo: ExplicativoContent | None
     dedup_key: str            # identifica a condição pra automação não postar a mesma coisa 2x (ver state.py)
     kicker_text: str | None = None  # sobrescreve o kicker padrão "{icao} · {uf}" (usado pelo fallback educativo)
+    explicativo_slides: list | None = None  # lista de ExplicativoContent extra — carrossel com MAIS de 1 slide
+    # explicativo (hoje só o fallback educativo usa: capa + 2 explicativos = 3 slides). Quando presente,
+    # slide.py.render_post_slides ignora `explicativo` (singular) e renderiza um slide por item da lista.
 
 
 def _metar_updated_label(metar: MetarResult) -> str:
@@ -334,15 +373,16 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
     severity = "alto" if headline_kind in _HIGH_SEVERITY_KINDS else "atenção"
     updated_label = _metar_updated_label(metar) if metar else "Aviso NOTAM ativo"
 
-    # título de capa: sempre com "Aeroporto de {cidade}" e terminando na
-    # consequência prática ("...pode atrasar ou alterar voos") — as duas
-    # palavras-chave que geram urgência pra quem vê o post parar pra ler
-    # (pedido explícito do usuário, 2026-08-24; exemplo dado: "Aeroporto de
-    # Natal: Risco de Tempestade pode atrasar / alterar voos").
+    # título de capa: sorteado entre vários formatos (ver _TITLE_TEMPLATES) pra
+    # não repetir sempre a mesma estrutura — só a consequência prática
+    # (atraso/cancelamento/alteração de voo) e a cidade são garantidas; a
+    # palavra "aeroporto" aparece em parte dos templates, não em todos
+    # (pedido explícito do usuário, 2026-08-24, depois de notar um "título
+    # padrão" repetido demais no feed real).
     problema = _HEADLINE_LABEL_SENTENCE[headline_kind][0].lower() + _HEADLINE_LABEL_SENTENCE[headline_kind][1:]
     if causa:
         problema += f" {causa}"
-    cover_title = f"Aeroporto de {airport['city']}: {problema} pode atrasar ou alterar voos"
+    cover_title = _pick_cover_title(airport['city'], problema, severity)
 
     background_category = "weather" if headline_kind in WEATHER_KINDS else _ILLUSTRATION_BY_KIND[headline_kind]
 
