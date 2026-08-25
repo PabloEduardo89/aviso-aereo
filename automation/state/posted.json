@@ -176,9 +176,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 3,
-    "last_fallback_at": "2026-08-25T09:39:29.522652+00:00",
-    "last_post_at": "2026-08-25T09:39:29.522652+00:00"
+    "fallback_topic_index": 4,
+    "last_fallback_at": "2026-08-25T14:02:46.306021+00:00",
+    "last_post_at": "2026-08-25T14:02:46.306021+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
@@ -187,6 +187,10 @@
   "fallback|direitos_passageiro|2026-08-24": {
     "media_id": "18141545890602835",
     "posted_at": "2026-08-24T14:57:10.805646+00:00"
+  },
+  "fallback|iata_icao|2026-08-25": {
+    "media_id": "17904500691507992",
+    "posted_at": "2026-08-25T14:02:46.306021+00:00"
   },
   "fallback|overbooking|2026-08-25": {
     "media_id": "18075165866422222",
