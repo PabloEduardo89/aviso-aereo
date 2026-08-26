@@ -595,6 +595,14 @@
 
   /* ---- mini-mapa de satélite (aba METAR > Imagem de satélite) ---- */
   .map-wrap.sat-mini{ height: 280px; }
+  /* ---- mini-mapa de satélite real (detalhe do NOTAM > Vista aérea) ---- */
+  .map-wrap.notam-mini{ height: 280px; }
+  .leaflet-tooltip{
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+    box-shadow: none; font-size: 11.5px;
+  }
+  .leaflet-tooltip-top:before{ border-top-color: var(--line); }
+  .leaflet-tooltip.notam-map-tag{ color: var(--red); border-color: var(--red); font-weight:600; }
 
   .aircraft-icon{
     position:relative;
@@ -792,6 +800,7 @@ const metarLoading = {};
 let GIBS_SATELITE = undefined;
 let gibsSateliteLoading = false;
 let sateliteMapInstance = null;
+let notamMapInstance = null; // mini-mapa de satélite real (Esri) no detalhe do NOTAM
 
 // cache de consultas históricas (METAR de um dia inteiro / satélite de um horário exato)
 // chave METAR: "ICAO_YYYY-MM-DD" -> undefined | null | [{hour, recebimento, parsed}]
@@ -2556,51 +2565,41 @@ function runwayHeadingDeg(identEnd){
   return m ? parseInt(m[1], 10) * 10 : 90;
 }
 
-// desenha o diagrama de pistas de um aeródromo de verdade: uma barra por pista,
-// rotacionada conforme o rumo, com a(s) cabeceira(s) rotuladas nas pontas — e destaca
-// em vermelho a pista citada no NOTAM (via "affected"), quando houver uma
-function svgRunwayChart(affected, runwayIdents){
-  const idents = (runwayIdents && runwayIdents.length) ? runwayIdents : ['09/27'];
-  const affectedIdent = affected ? affected.replace(/^rwy/i, '').toUpperCase() : null;
-  const cx = 160, cy = 110, barLen = 170, barW = 13;
-  const n = idents.length;
+// desloca um ponto lat/lon por uma certa distância (em metros) num rumo — aproximação
+// planar (não considera curvatura da Terra), suficiente pra escala de um aeródromo
+function offsetLatLon(lat, lon, headingDeg, meters){
+  const rad = (headingDeg * Math.PI) / 180;
+  const dLat = (meters * Math.cos(rad)) / 111320;
+  const dLon = (meters * Math.sin(rad)) / (111320 * Math.cos((lat * Math.PI) / 180));
+  return [lat + dLat, lon + dLon];
+}
 
-  const bars = idents.map((identPair, i) => {
-    const [endA, endB] = identPair.split('/');
-    const heading = runwayHeadingDeg(endA);
-    const rotation = heading - 90;
-    const rad = (heading * Math.PI) / 180;
-    // pistas paralelas (mesmo rumo) ficam sobrepostas se não deslocarmos uma das barras
-    // perpendicularmente ao rumo; pistas que se cruzam (rumos diferentes) não precisam disso
-    const offset = n > 1 ? (i - (n-1)/2) * 32 : 0;
-    const bcx = cx + Math.cos(rad)*offset, bcy = cy + Math.sin(rad)*offset;
-    const halfLen = barLen/2 + 14;
-    const ex1 = bcx - Math.sin(rad)*halfLen, ey1 = bcy + Math.cos(rad)*halfLen;
-    const ex2 = bcx + Math.sin(rad)*halfLen, ey2 = bcy - Math.cos(rad)*halfLen;
-    const isHighlighted = affectedIdent && (endA.toUpperCase() === affectedIdent || endB.toUpperCase() === affectedIdent || identPair.toUpperCase() === affectedIdent);
+const NOTAM_NONRUNWAY_LABEL = { apron: 'Pátio', twy: 'Pista de táxi', airspace: 'Espaço aéreo', nav: 'Auxílio à navegação' };
 
-    return `
-      <rect x="${bcx-barLen/2}" y="${bcy-barW/2}" width="${barLen}" height="${barW}" rx="2"
-        fill="${isHighlighted ? '#3A2A22' : '#2B3A56'}"
-        stroke="${isHighlighted ? '#F2665A' : 'none'}" stroke-width="${isHighlighted ? 2.5 : 0}"
-        ${isHighlighted ? 'stroke-dasharray="5 3"' : ''}
-        transform="rotate(${rotation} ${bcx} ${bcy})"/>
-      <text x="${ex1}" y="${ey1}" fill="#7C8AA5" font-size="9" font-family="monospace" text-anchor="middle">${endA}</text>
-      <text x="${ex2}" y="${ey2}" fill="#7C8AA5" font-size="9" font-family="monospace" text-anchor="middle">${endB}</text>`;
-  }).join('');
-
-  // categorias que não são pista (pátio, espaço aéreo, navegação) não têm coordenada real
-  // disponível — mostra um selo textual simples em vez de fingir uma posição exata
-  const nonRunwayLabel = { apron: 'PÁTIO', airspace: 'ESPAÇO AÉREO', nav: 'AUXÍLIO À NAVEGAÇÃO', twy: 'PISTA DE TÁXI' }[affected];
-  const nonRunwayTag = nonRunwayLabel ? `<rect x="10" y="10" width="${18+nonRunwayLabel.length*5.6}" height="18" rx="9" fill="rgba(242,102,90,0.15)" stroke="#F2665A"/><text x="19" y="23" fill="#F2665A" font-size="9.5" font-family="monospace">${nonRunwayLabel}</text>` : '';
-
-  return `
-  <svg viewBox="0 0 320 220" xmlns="http://www.w3.org/2000/svg">
-    <rect width="320" height="220" fill="#0B111E"/>
-    <circle cx="${cx}" cy="${cy}" r="3" fill="#263352"/>
-    ${bars}
-    ${nonRunwayTag}
-  </svg>`;
+// desenha, sobre o mapa de satélite real do detalhe do NOTAM, um destaque aproximado
+// do elemento citado no aviso: uma linha tracejada no rumo da pista (quando é o caso)
+// centrada no ponto de referência do aeródromo, ou um selo com rótulo pras categorias
+// sem posição própria (pátio, táxi, espaço aéreo, navegação). É uma aproximação visual,
+// não georreferenciada com precisão — a AISWEB não informa a coordenada exata de cada
+// pista — por isso os links pra localização exata (DECEA) e carta oficial ficam logo
+// abaixo, pra quem precisa da posição precisa
+function drawNotamHighlight(map, airport, affected, runwaysList){
+  if(!affected) return;
+  if(affected.startsWith('rwy')){
+    const identNum = affected.replace(/^rwy/i, '').toUpperCase();
+    const fullIdent = (runwaysList || []).find(pair => pair.split('/').some(end => end.toUpperCase() === identNum));
+    const heading = runwayHeadingDeg(fullIdent ? fullIdent.split('/')[0] : identNum);
+    const halfLenMeters = 1000; // comprimento genérico — a AISWEB não informa a extensão real de cada pista aqui
+    const p1 = offsetLatLon(airport.lat, airport.lon, heading, halfLenMeters);
+    const p2 = offsetLatLon(airport.lat, airport.lon, heading + 180, halfLenMeters);
+    L.polyline([p1, p2], { color: '#F2665A', weight: 5, opacity: 0.85, dashArray: '9 7', lineCap: 'butt' })
+      .addTo(map)
+      .bindTooltip(`Pista ${fullIdent || identNum} (posição aproximada)`, { className: 'notam-map-tag', direction: 'top' });
+  } else if(NOTAM_NONRUNWAY_LABEL[affected]){
+    L.circleMarker([airport.lat, airport.lon], { radius: 11, color: '#F2665A', weight: 2, fillColor: '#F2665A', fillOpacity: 0.2 })
+      .addTo(map)
+      .bindTooltip(NOTAM_NONRUNWAY_LABEL[affected], { permanent: true, direction: 'top', className: 'notam-map-tag' });
+  }
 }
 
 function svgSatellite(level){
@@ -2637,6 +2636,10 @@ function render(){
   if(!(currentTab === 'metar' && metarSubTab === 'imagem') && sateliteMapInstance){
     sateliteMapInstance.remove();
     sateliteMapInstance = null;
+  }
+  if(currentView !== 'notam-detail' && notamMapInstance){
+    notamMapInstance.remove();
+    notamMapInstance = null;
   }
 
   if(currentTab === 'mapa'){
@@ -3134,9 +3137,9 @@ function renderNotamDetail(main, airport){
     </div>
     <div class="plain-block summary${notamSummaryOpen ? ' show' : ''}" id="notamSummaryBlock">${buildNotamPlainSummary(n, airport, summaryRefTime)}</div>
 
-    <div class="section-label">Carta do aeródromo</div>
-    <div class="image-frame">${svgRunwayChart(n.affected, runwaysList)}</div>
-    <div class="image-caption">Diagrama esquemático com a(s) pista(s) real(is) do aeródromo${n.affected && n.affected.startsWith('rwy') ? ', pista citada no aviso destacada em vermelho' : ''}.${geoLink}${cartaLink}</div>
+    <div class="section-label">Vista aérea do aeródromo</div>
+    <div class="image-frame"><div class="map-wrap notam-mini" id="notamMapWrap"><div id="notamMap" style="width:100%; height:100%;"></div></div></div>
+    <div class="image-caption">Imagem de satélite real, centrada no aeródromo${n.affected ? ' — destaque aproximado do elemento citado no aviso' : ''}.${geoLink}${cartaLink}</div>
 
     <div class="section-label">Em linguagem simples</div>
     <div class="plain-block">${n.full}</div>
@@ -3144,6 +3147,24 @@ function renderNotamDetail(main, airport){
     <div class="section-label">Texto original (NOTAM)</div>
     <div class="raw-box show" style="margin-bottom:16px;">${n.raw}</div>
   `;
+
+  if(notamMapInstance){ notamMapInstance.remove(); notamMapInstance = null; }
+  notamMapInstance = L.map('notamMap', {
+    center: [airport.lat, airport.lon],
+    zoom: 15,
+    minZoom: 12,
+    maxZoom: 18,
+    attributionControl: true,
+    fadeAnimation: false, // sem isso os tiles às vezes ficam presos em opacity:0
+  });
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Imagens: Esri, Maxar, Earthstar Geographics',
+    maxZoom: 19,
+  }).addTo(notamMapInstance);
+  L.circleMarker([airport.lat, airport.lon], {
+    radius: 5, color: '#F2A93B', weight: 2, fillColor: '#F2A93B', fillOpacity: 0.9,
+  }).addTo(notamMapInstance).bindTooltip(airport.code);
+  drawNotamHighlight(notamMapInstance, airport, n.affected, runwaysList);
 }
 
 function toggleRaw(i){
