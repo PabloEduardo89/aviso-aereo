@@ -1708,7 +1708,6 @@ function parseNotamXmlItem(item){
     validFrom: notamFieldToDate(xmlText(item,'b')),
     validUntil: notamFieldToDate(xmlText(item,'c')),
     affected,
-    geoUrl: xmlText(item, 'geo_url') || null,
   };
 }
 
@@ -2042,15 +2041,22 @@ let notamSummaryOpen = false;
    ========================================================= */
 const MAP_POLL_MS = 13000; // ~13s — folgado em relação ao limite do airplanes.live (1 req/s)
 
+// tile escuro de fundo (Mapa ao Vivo e mini-mapa de satélite do METAR) — usa Esri
+// Canvas/World_Dark_Gray_Base porque é gratuito e não exige chave de API; o CARTO
+// dark_all usado antes passou a exigir cadastro/chave e virou tile de erro
+// ("API KEY REQUIRED" escrito por cima do mapa)
+const DARK_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const DARK_TILE_ATTRIBUTION = 'Tiles &copy; Esri';
+
 function initMap(){
   mapInstance = L.map('liveMap', {
     center: [-15.78, -47.93], // centro aproximado do Brasil (Brasília)
     zoom: 5,
   });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    subdomains: 'abcd',
+  L.tileLayer(DARK_TILE_URL, {
+    attribution: DARK_TILE_ATTRIBUTION,
     maxZoom: 19,
+    maxNativeZoom: 16, // acima disso o Esri Canvas não tem tile — o Leaflet amplia o último nível em vez de quebrar
   }).addTo(mapInstance);
 
   mapInstance.on('moveend zoomend', () => {
@@ -3045,10 +3051,10 @@ function renderMetarImagem(metarData){
       attributionControl: true,
       fadeAnimation: false, // sem isso os tiles às vezes ficam presos em opacity:0
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd',
+    L.tileLayer(DARK_TILE_URL, {
+      attribution: DARK_TILE_ATTRIBUTION,
       maxZoom: 19,
+      maxNativeZoom: 16,
     }).addTo(sateliteMapInstance);
     L.tileLayer(GIBS_TILE_URL, {
       attribution: 'Satélite: NASA GIBS (GOES-East GeoColor)',
@@ -3110,9 +3116,6 @@ function renderNotamDetail(main, airport){
   const n = currentNotamList[currentNotamIndex];
   const rotaerData = getRotaerData(currentCode);
   const runwaysList = rotaerData && rotaerData.runwaysList;
-  const geoLink = n.geoUrl
-    ? ` <a href="${n.geoUrl}" target="_blank" rel="noopener" style="color:var(--blue);">Ver localização exata no mapa oficial (DECEA)</a>.`
-    : '';
   const cartaUrl = getCartaAdcUrl(currentCode);
   const cartaLink = cartaUrl
     ? ` <a href="${cartaUrl}" target="_blank" rel="noopener" style="color:var(--blue);">Ver Carta de Aeródromo oficial (PDF, técnico)</a>.`
@@ -3139,7 +3142,7 @@ function renderNotamDetail(main, airport){
 
     <div class="section-label">Vista aérea do aeródromo</div>
     <div class="image-frame"><div class="map-wrap notam-mini" id="notamMapWrap"><div id="notamMap" style="width:100%; height:100%;"></div></div></div>
-    <div class="image-caption">Imagem de satélite real, centrada no aeródromo${n.affected ? ' — destaque aproximado do elemento citado no aviso' : ''}.${geoLink}${cartaLink}</div>
+    <div class="image-caption">Imagem de satélite real, centrada no aeródromo${n.affected ? ' — destaque aproximado do elemento citado no aviso' : ''}.${cartaLink}</div>
 
     <div class="section-label">Em linguagem simples</div>
     <div class="plain-block">${n.full}</div>
