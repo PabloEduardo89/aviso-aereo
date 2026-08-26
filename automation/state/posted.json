@@ -208,9 +208,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 7,
-    "last_fallback_at": "2026-08-25T20:33:01.117861+00:00",
-    "last_post_at": "2026-08-25T23:28:00.581599+00:00"
+    "fallback_topic_index": 8,
+    "last_fallback_at": "2026-08-26T01:26:47.953225+00:00",
+    "last_post_at": "2026-08-26T01:26:47.953225+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
@@ -223,6 +223,10 @@
   "fallback|iata_icao|2026-08-25": {
     "media_id": "17904500691507992",
     "posted_at": "2026-08-25T14:02:46.306021+00:00"
+  },
+  "fallback|matricula_aeronave|2026-08-26": {
+    "media_id": "18090362648154124",
+    "posted_at": "2026-08-26T01:26:47.953225+00:00"
   },
   "fallback|o_que_e_notam|2026-08-25": {
     "media_id": "18101893658209586",
