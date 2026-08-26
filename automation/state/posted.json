@@ -195,6 +195,10 @@
     "media_id": "17907081681524860",
     "posted_at": "2026-08-24T14:26:48.238576+00:00"
   },
+  "SBSG|weather|convective|2026-08-26": {
+    "media_id": "18098651300456773",
+    "posted_at": "2026-08-26T11:40:13.622514+00:00"
+  },
   "SBSL|weather|convective|2026-08-25": {
     "media_id": "17881113636685348",
     "posted_at": "2026-08-25T15:45:53.886443+00:00"
@@ -216,13 +220,17 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 9,
-    "last_fallback_at": "2026-08-26T05:37:39.762710+00:00",
-    "last_post_at": "2026-08-26T05:37:39.762710+00:00"
+    "fallback_topic_index": 10,
+    "last_fallback_at": "2026-08-26T11:33:54.270053+00:00",
+    "last_post_at": "2026-08-26T11:40:13.622514+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
     "posted_at": "2026-08-25T09:39:29.522652+00:00"
+  },
+  "fallback|categorias_jatinhos|2026-08-26": {
+    "media_id": "18094204430418406",
+    "posted_at": "2026-08-26T11:33:54.270053+00:00"
   },
   "fallback|direitos_passageiro|2026-08-24": {
     "media_id": "18141545890602835",
