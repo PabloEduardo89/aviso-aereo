@@ -270,6 +270,15 @@
   }
   .section-label:first-child{ margin-top:0; }
 
+  .notam-filter-toggle{
+    margin: -4px 0 12px;
+    font-size: 12px;
+    color: var(--amber);
+    cursor: pointer;
+    user-select: none;
+    display: inline-block;
+  }
+
   .card{
     background: var(--panel);
     border: 1px solid var(--line);
@@ -314,8 +323,26 @@
   .badge.info{ background: rgba(95,168,232,0.15); color: var(--blue); }
 
   .card-meta{
-    display:flex; gap:14px; margin-top:8px;
+    display:flex; gap:14px; margin-top:8px; flex-wrap:wrap;
     font-size:12px; color: var(--muted);
+  }
+  .notam-status{
+    display:inline-flex; align-items:center; gap:6px;
+    font-weight:600;
+  }
+  .notam-status .dot{
+    width:6px; height:6px; border-radius:50%;
+    background: var(--muted);
+    flex-shrink:0;
+  }
+  .notam-status.active{ color: var(--green); }
+  .notam-status.active .dot{ background: var(--green); }
+  .notam-status.scheduled{ color: var(--blue); }
+  .notam-status.scheduled .dot{ background: var(--blue); }
+  .notam-status.expired{ color: var(--muted); }
+  .card-validity{
+    margin-top:2px;
+    font-size:11.5px; color: var(--muted);
   }
 
   .link-row{
@@ -1473,6 +1500,106 @@ function translateNotamText(raw){
   }).join(' ');
 }
 
+/* =========================================================
+   TRADUÇÃO POR RECONHECIMENTO DE PADRÃO — pros casos mais comuns de
+   NOTAM (pista fechada, equipamento fora, obstáculo, restrição de
+   espaço aéreo, táxi/pátio fechado), monta uma frase pronta em vez da
+   tradução palavra-por-palavra. Só entra em ação quando a estrutura é
+   reconhecida com confiança (mesmo princípio do classifyNotamLevel:
+   regra objetiva, nunca "achismo"); qualquer coisa fora desses
+   padrões cai de volta pro translateNotamText acima. O texto original
+   (raw) continua sempre disponível em "Texto original" pra conferência,
+   então um reconhecimento imperfeito aqui nunca esconde a fonte.
+   ========================================================= */
+function capitalizeFirst(s){
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+// pega o trecho entre "DUE"/"DEVIDO" e o próximo marcador de data/campo, e
+// traduz palavra por palavra (reaproveitando o dicionário) pra virar o
+// motivo em português dentro da frase natural — ex.: "DUE MAINT WEF 25 JUL"
+// -> "manutenção"
+function extractNotamReason(upper){
+  const m = upper.match(/\b(?:DUE(?:\s+TO)?|DEVIDO(?:\s+A)?)\s+([A-Z0-9À-Ú/\s]+?)(?=\s+(?:WEF|UNTIL|TIL|FROM|BTN)\b|$)/);
+  if(!m) return null;
+  const phrase = translateNotamText(m[1].trim()).toLowerCase().trim()
+    // "DEVIDO SER MAINT" é a forma mais comum na AISWEB pra "devido a serviço de
+    // manutenção" — a tradução palavra-por-palavra vira "serviço manutenção",
+    // redundante; "manutenção" sozinho já cobre o sentido
+    .replace(/\bserviço\s+manutenção\b/, 'manutenção');
+  return phrase || null;
+}
+
+// nome mais reconhecível do equipamento citado (quando dá pra identificar por
+// palavra-chave conhecida); senão cai num rótulo genérico pela categoria
+function notamEquipmentLabel(upper, cat){
+  if(/\bVOR\/DME\b/.test(upper)) return 'VOR/DME (auxílio à navegação)';
+  if(/\bILS\b/.test(upper)) return 'ILS (sistema de pouso por instrumentos)';
+  if(/\bALS\b/.test(upper)) return 'sistema de luzes de aproximação (ALS)';
+  if(/\bDME\b/.test(upper)) return 'DME (auxílio à navegação)';
+  if(/\bNDB\b/.test(upper)) return 'NDB (radiofarol não direcional)';
+  if(/\bVOR\b/.test(upper)) return 'VOR (auxílio à navegação)';
+  return cat === 'CNS' ? 'equipamento de comunicação' : 'equipamento de navegação';
+}
+
+function translateNotamNatural(raw, cat){
+  if(!raw) return null;
+  const upper = raw.toUpperCase();
+  const reason = extractNotamReason(upper);
+  const reasonSuffix = reason ? `, devido a ${reason}` : '';
+
+  const rwyMatch = upper.match(/\bRWY\s*(\d{2}[LRC]?)\/(\d{2}[LRC]?)\b/);
+  if(rwyMatch && /\bCLSD\b/.test(upper)){
+    const ident = `${rwyMatch[1]}/${rwyMatch[2]}`;
+    return /\bPARTIAL\b/.test(upper)
+      ? `Pista ${ident} com uso parcial${reasonSuffix}.`
+      : `Pista ${ident} fechada para pouso e decolagem${reasonSuffix}.`;
+  }
+
+  if(/\bU\/S\b/.test(upper) && (cat === 'NAV' || cat === 'CNS')){
+    return `${capitalizeFirst(notamEquipmentLabel(upper, cat))} fora de serviço${reasonSuffix}.`;
+  }
+
+  if(/\bOBST\b/.test(upper)){
+    const heightMatch = upper.match(/(\d+)\s*(FT|M)\b/);
+    const heightSuffix = heightMatch ? `, com cerca de ${heightMatch[1]} ${heightMatch[2] === 'M' ? 'metros' : 'pés'} de altura` : '';
+    return `Novo obstáculo sinalizado nas proximidades do aeródromo${heightSuffix}.`;
+  }
+
+  // "área restrita" já vem escrito em português por conta própria na AISWEB (não é
+  // abreviação ICAO em inglês) — o texto entre parênteses costuma ser o nome do
+  // evento/motivo (ex.: "(DESFILE DE SETE DE SETEMBRO)"), então extrai isso em vez
+  // de tentar reescrever a frase inteira
+  if(/\bAREA RESTRITA\b/.test(upper) || /\bRESTRICTED AREA\b/.test(upper)){
+    const eventMatch = raw.match(/\(([^)]{3,60})\)/);
+    const eventSuffix = eventMatch ? `, referente a ${eventMatch[1].toLowerCase()}` : '';
+    return `Área com restrição de voo temporária${eventSuffix}.`;
+  }
+
+  // operação de drone/aeronave remotamente pilotada: a área é sempre descrita por
+  // uma lista de coordenadas geográficas, que não dá pra resumir em frase sem
+  // perder precisão — por segurança, aponta pro texto original em vez de tentar
+  // descrever a área
+  if(/\bRPA\b/.test(upper) || /\bUAS\b/.test(upper)){
+    return 'Operação autorizada de aeronave não tripulada (drone) em área e período específicos — ver coordenadas no texto original.';
+  }
+
+  if(cat === 'ATM'){
+    return `Restrição temporária de espaço aéreo${reasonSuffix}.`;
+  }
+
+  const twyMatch = upper.match(/\bTWY\s*([A-Z0-9]+)\b/);
+  if(twyMatch && /\bCLSD\b/.test(upper)){
+    return `Pista de táxi ${twyMatch[1]} fechada${reasonSuffix}.`;
+  }
+
+  if(/\bAPRON\b/.test(upper) && /\bCLSD\b/.test(upper)){
+    return `Área do pátio fechada ou indisponível${reasonSuffix}.`;
+  }
+
+  return null;
+}
+
 const NOTAM_CAT_LABEL = { AGA:'Pista/Solo', CNS:'Comunicação/Navegação', NAV:'Navegação', OTR:'Outros', MET:'Meteorologia', ATM:'Espaço aéreo' };
 
 // classifica severidade olhando o código Q e palavras-chave no corpo do aviso —
@@ -1486,6 +1613,24 @@ function classifyNotamLevel(parsed){
   if(parsed.cat === 'ATM') return 'med';
   return 'low';
 }
+
+// ícone curto por tipo de impacto (não por severidade — a cor do card já cobre isso),
+// pra escanear em uma olhada QUE tipo de aviso é, mesma regra de leitura do
+// classifyNotamLevel; entra como prefixo do badge, sem criar elemento novo na tela
+function notamImpactIcon(parsed){
+  const e = (parsed.e || '').toUpperCase();
+  if(/\bCLSD\b/.test(e) && /\bRWY\b/.test(e)) return '🚫';       // pista fechada
+  if(/\bOBST\b/.test(e)) return '🗼';                             // obstáculo
+  if(/\bU\/S\b/.test(e) && (parsed.cat === 'NAV' || parsed.cat === 'CNS')) return '📡'; // equipamento/navegação fora
+  if(parsed.cat === 'ATM') return '✈️';                           // espaço aéreo / restrição
+  if(parsed.cat === 'MET') return '🌦️';                           // meteorologia
+  if(/\bTWY\b/.test(e)) return '🛣️';                              // pista de táxi
+  if(/\bAPRON\b/.test(e)) return '🅿️';                            // pátio
+  return 'ℹ️';
+}
+// mesmo ícone "genérico" acima, indexado por nível — usado só pros dados de
+// exemplo (MOCK_NOTAM), que não têm o texto E) original pra rodar notamImpactIcon
+const NOTAM_LEVEL_FALLBACK_ICON = { high: '🚫', med: '📡', low: 'ℹ️' };
 
 // datas da AISWEB vêm como YYMMDDHHmm (10 dígitos, UTC)
 function parseNotamDateField(s){
@@ -1536,13 +1681,15 @@ function parseNotamXmlItem(item){
   const e = xmlText(item, 'e');
   const cat = xmlText(item, 'cat');
   const level = classifyNotamLevel({ e, cat });
-  const translated = translateNotamText(e);
+  const icon = notamImpactIcon({ e, cat });
+  const translated = translateNotamNatural(e, cat) || translateNotamText(e);
   const rwyMatch = e.match(/\bRWY\s*(\d{2}[LRC]?)\/(\d{2}[LRC]?)/i);
   const affected = rwyMatch ? `rwy${rwyMatch[1]}` : /\bAPRON\b/i.test(e) ? 'apron' : /\bTWY\b/i.test(e) ? 'twy' : null;
   return {
     id: xmlText(item, 'id'),
     tp: xmlText(item, 'tp'),
     level,
+    icon,
     title: translated.length > 90 ? translated.slice(0, 87) + '...' : translated,
     plain: translated,
     full: translated,
@@ -1599,6 +1746,46 @@ function buildNotamPlainSummary(notice, airport, refTime){
   sentences.push(`STATUS: ${NOTAM_STATUS_WORD[notice.level] || '—'}.`);
 
   return sentences.filter(Boolean).join(' ');
+}
+
+/* =========================================================
+   STATUS DE VIGÊNCIA E ORDENAÇÃO POR RELEVÂNCIA — badge curto
+   ("ativo agora" / "programado" / "expirado") pra escanear a lista
+   sem abrir o detalhe, e critério de ordenação (crítico primeiro,
+   depois quem vence mais cedo) reaproveitando os mesmos campos já
+   calculados no parse (validFrom/validUntil). refTime opcional
+   segue o mesmo racional do buildNotamPlainSummary: no modo
+   histórico, usa o meio-dia da data escolhida em vez do "agora" real.
+   ========================================================= */
+function notamStatusInfo(notice, refTime){
+  const ref = refTime === undefined ? Date.now() : refTime;
+  if(!notice.validFrom) return { key: 'unknown', label: '', rank: 3 };
+  if(ref < notice.validFrom.getTime()){
+    return { key: 'scheduled', label: `Programado · começa ${describeRelativeDate(notice.validFrom, ref)}`, rank: 1 };
+  }
+  if(notice.validUntil && ref > notice.validUntil.getTime()){
+    return { key: 'expired', label: `Expirado · encerrou ${describeRelativeDate(notice.validUntil, ref)}`, rank: 2 };
+  }
+  if(notice.validUntil){
+    return { key: 'active', label: `Ativo agora · termina ${describeRelativeDate(notice.validUntil, ref)}`, rank: 0 };
+  }
+  return { key: 'active', label: 'Ativo agora · sem término previsto', rank: 0 };
+}
+
+// crítico (high) primeiro, depois médio, depois baixo; dentro do mesmo nível,
+// quem está ativo agora vem antes de programado/expirado, e entre dois ativos
+// quem vence mais cedo aparece primeiro — é o "o que importa agora" no topo
+const NOTAM_LEVEL_RANK = { high: 0, med: 1, low: 2 };
+function sortNotamsByRelevance(notices, refTime){
+  return [...notices].sort((a, b) => {
+    const la = NOTAM_LEVEL_RANK[a.level] ?? 3, lb = NOTAM_LEVEL_RANK[b.level] ?? 3;
+    if(la !== lb) return la - lb;
+    const sa = notamStatusInfo(a, refTime), sb = notamStatusInfo(b, refTime);
+    if(sa.rank !== sb.rank) return sa.rank - sb.rank;
+    const ea = a.validUntil ? a.validUntil.getTime() : Infinity;
+    const eb = b.validUntil ? b.validUntil.getTime() : Infinity;
+    return ea - eb;
+  });
 }
 
 function toggleNotamSummary(){
@@ -2309,6 +2496,7 @@ let historicHour = null;   // 0-23 (UTC), horário escolhido dentro do dia
 
 let notamMode = "live";         // 'live' | 'historic'
 let notamHistoricDate = null;   // 'YYYY-MM-DD' (Brasília)
+let notamRelevanceFilter = "all"; // 'all' | 'relevant' (esconde os "low"/informativos)
 
 /* =========================================================
    MAPA AO VIVO — tráfego aéreo em tempo real (airplanes.live,
@@ -2577,37 +2765,80 @@ function renderNotamList(data){
     sections.innerHTML = `<div class="empty"><div class="icon">—</div>${msg}</div>`;
     return;
   }
-  currentNotamList = data.notices;
   const sourceHtml = sourceTagHtml(data.source, 'AISWEB');
   if(data.notices.length === 0){
+    currentNotamList = [];
     const msg = notamMode === 'historic'
       ? 'Nenhum aviso em vigor nesta data para este aeroporto.'
       : 'Nenhum aviso relevante no momento para este aeroporto.';
     sections.innerHTML = sourceHtml + `<div class="empty"><div class="icon">✓</div>${msg}</div>`;
     return;
   }
+  // no modo histórico, "agora" pro cálculo de status é o meio-dia (Brasília) da data
+  // escolhida — mesmo racional usado no resumo em linguagem simples do detalhe
+  let refTime;
+  if(notamMode === 'historic' && notamHistoricDate){
+    const { start, end } = localDateDayRangeUTC(notamHistoricDate);
+    refTime = (start.getTime() + end.getTime()) / 2;
+  }
+  const sorted = sortNotamsByRelevance(data.notices, refTime);
+  // "relevante" = não-informativo (high/med) — mesmo corte que já existe na
+  // classificação (levelLabel low = "Informativo"), sem inventar critério novo
+  const hiddenCount = sorted.filter(n => n.level === 'low').length;
+  const showingFiltered = notamRelevanceFilter === 'relevant' && hiddenCount > 0;
+  currentNotamList = showingFiltered ? sorted.filter(n => n.level !== 'low') : sorted;
+  const criticalCount = currentNotamList.filter(n => n.level === 'high').length;
   const label = notamMode === 'historic' ? 'Avisos em vigor nesta data' : 'Avisos ativos';
-  sections.innerHTML = sourceHtml + `<div class="section-label">${label} · ${data.notices.length}</div>` +
-    data.notices.map((n, i) => `
+  const criticalHtml = criticalCount ? ` · ${criticalCount} crítico${criticalCount > 1 ? 's' : ''}` : '';
+
+  // toggle só aparece quando há informativos pra esconder — senão seria um botão
+  // sem efeito nenhum na tela
+  const filterToggleHtml = hiddenCount > 0
+    ? `<div class="notam-filter-toggle" onclick="toggleNotamRelevanceFilter()">${
+        showingFiltered ? `Mostrar todos (+${hiddenCount} informativo${hiddenCount > 1 ? 's' : ''})` : 'Mostrar só relevantes'
+      }</div>`
+    : '';
+
+  if(currentNotamList.length === 0){
+    sections.innerHTML = sourceHtml +
+      `<div class="section-label">${label} · 0${criticalHtml}</div>` + filterToggleHtml +
+      `<div class="empty"><div class="icon">✓</div>Todos os ${hiddenCount} avisos desta seleção são informativos/rotineiros.</div>`;
+    return;
+  }
+
+  sections.innerHTML = sourceHtml +
+    `<div class="section-label">${label} · ${currentNotamList.length}${criticalHtml}</div>` + filterToggleHtml +
+    currentNotamList.map((n, i) => {
+      const status = notamStatusInfo(n, refTime);
+      const statusHtml = status.label ? `<span class="notam-status ${status.key}"><span class="dot"></span>${status.label}</span>` : '';
+      const icon = n.icon || NOTAM_LEVEL_FALLBACK_ICON[n.level] || '';
+      return `
       <div class="card ${n.level}">
         <div class="card-top">
           <div class="card-title">${n.title}</div>
-          <div class="badge ${n.level}">${levelLabel(n.level)}</div>
+          <div class="badge ${n.level}">${icon} ${levelLabel(n.level)}</div>
         </div>
         <div style="margin-top:8px; font-size:13.5px; color:var(--text); opacity:0.9; line-height:1.5;">
           ${n.plain}
         </div>
         <div class="card-meta">
+          ${statusHtml}
           <span>${n.category}</span>
-          <span>Válido: ${n.validity}</span>
         </div>
+        <div class="card-validity">Válido: ${n.validity}</div>
         <div class="link-row">
           <div class="toggle-raw" onclick="toggleRaw(${i})" id="toggle-${i}">Texto original</div>
           <div class="link-detail" onclick="openNotamDetail(${i})">Ver carta e detalhes</div>
         </div>
         <div class="raw-box" id="raw-${i}">${n.raw}</div>
       </div>
-    `).join('');
+    `;
+    }).join('');
+}
+
+function toggleNotamRelevanceFilter(){
+  notamRelevanceFilter = notamRelevanceFilter === 'all' ? 'relevant' : 'all';
+  render();
 }
 
 function renderMetarSection(airport){
