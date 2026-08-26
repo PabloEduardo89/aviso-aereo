@@ -15,6 +15,14 @@
     "media_id": "18364684873243289",
     "posted_at": "2026-08-24T19:39:11.460925+00:00"
   },
+  "SBBE|weather|convective|2026-08-25": {
+    "media_id": "18104273569927551",
+    "posted_at": "2026-08-25T21:44:51.467173+00:00"
+  },
+  "SBBE|weather|thunderstorm|2026-08-25": {
+    "media_id": "18338674042265621",
+    "posted_at": "2026-08-25T22:43:53.883252+00:00"
+  },
   "SBBR|notam|12777479": {
     "media_id": "18146069875534478",
     "posted_at": "2026-08-24T16:41:58.866854+00:00"
@@ -22,6 +30,10 @@
   "SBBR|weather|convective|2026-08-24": {
     "media_id": "18407606008087974",
     "posted_at": "2026-08-24T17:34:14.867602+00:00"
+  },
+  "SBBR|weather|convective|2026-08-26": {
+    "media_id": "18104148277908260",
+    "posted_at": "2026-08-26T16:27:38.507866+00:00"
   },
   "SBBV|notam|12676040": {
     "media_id": "skipped_at_launch_no_post",
@@ -34,6 +46,18 @@
   "SBBV|weather|convective|2026-08-24": {
     "media_id": "18203332171367715",
     "posted_at": "2026-08-24T22:42:45.868427+00:00"
+  },
+  "SBBV|weather|convective|2026-08-25": {
+    "media_id": "17876002509548439",
+    "posted_at": "2026-08-25T18:56:05.703799+00:00"
+  },
+  "SBBV|weather|convective|2026-08-26": {
+    "media_id": "18453327580186294",
+    "posted_at": "2026-08-26T04:49:37.036312+00:00"
+  },
+  "SBBV|weather|thunderstorm|2026-08-25": {
+    "media_id": "18145700698538850",
+    "posted_at": "2026-08-25T23:28:00.581599+00:00"
   },
   "SBCF|notam|12659857": {
     "media_id": "skipped_at_launch_no_post",
@@ -51,6 +75,10 @@
     "media_id": "18061538096787742",
     "posted_at": "2026-08-25T01:23:37.773948+00:00"
   },
+  "SBCF|weather|convective|2026-08-25": {
+    "media_id": "18091997837382122",
+    "posted_at": "2026-08-25T19:41:46.534577+00:00"
+  },
   "SBCF|weather|thunderstorm|2026-08-23": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -62,6 +90,18 @@
   "SBCG|notam|12672791": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
+  },
+  "SBCG|weather|convective|2026-08-26": {
+    "media_id": "18121844434888805",
+    "posted_at": "2026-08-26T15:01:21.235186+00:00"
+  },
+  "SBCG|weather|thunderstorm|2026-08-25": {
+    "media_id": "18442312420122925",
+    "posted_at": "2026-08-25T22:37:34.429411+00:00"
+  },
+  "SBCG|weather|thunderstorm|2026-08-26": {
+    "media_id": "17934530955364304",
+    "posted_at": "2026-08-26T04:43:16.585956+00:00"
   },
   "SBCT|notam|12432948": {
     "media_id": "skipped_at_launch_no_post",
@@ -119,6 +159,10 @@
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
+  "SBGO|weather|convective|2026-08-26": {
+    "media_id": "18112723928063425",
+    "posted_at": "2026-08-26T14:55:00.961679+00:00"
+  },
   "SBGR|notam|12568986": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -130,6 +174,10 @@
   "SBJP|notam|12468791": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
+  },
+  "SBJP|notam|12782899": {
+    "media_id": "17907674580515940",
+    "posted_at": "2026-08-26T16:33:57.604188+00:00"
   },
   "SBPA|notam|12418641": {
     "media_id": "skipped_at_launch_no_post",
@@ -147,6 +195,10 @@
     "media_id": "18146374579528015",
     "posted_at": "2026-08-24T19:32:47.111359+00:00"
   },
+  "SBRB|weather|convective|2026-08-25": {
+    "media_id": "17900367279352063",
+    "posted_at": "2026-08-25T21:32:15.177123+00:00"
+  },
   "SBRJ|notam|12763264": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -158,6 +210,14 @@
   "SBSG|weather|convective|2026-08-24": {
     "media_id": "17907081681524860",
     "posted_at": "2026-08-24T14:26:48.238576+00:00"
+  },
+  "SBSG|weather|convective|2026-08-26": {
+    "media_id": "18098651300456773",
+    "posted_at": "2026-08-26T11:40:13.622514+00:00"
+  },
+  "SBSL|weather|convective|2026-08-25": {
+    "media_id": "17881113636685348",
+    "posted_at": "2026-08-25T15:45:53.886443+00:00"
   },
   "SBSP|notam|12665650": {
     "media_id": "skipped_at_launch_no_post",
@@ -176,12 +236,44 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 1,
-    "last_fallback_at": "2026-08-24T14:57:10.805646+00:00",
-    "last_post_at": "2026-08-25T01:23:37.773948+00:00"
+    "fallback_topic_index": 11,
+    "last_fallback_at": "2026-08-26T16:21:17.308496+00:00",
+    "last_post_at": "2026-08-26T16:33:57.604188+00:00"
+  },
+  "fallback|bagagem|2026-08-25": {
+    "media_id": "18183095581407362",
+    "posted_at": "2026-08-25T09:39:29.522652+00:00"
+  },
+  "fallback|categorias_jatinhos|2026-08-26": {
+    "media_id": "18094204430418406",
+    "posted_at": "2026-08-26T11:33:54.270053+00:00"
+  },
+  "fallback|custo_jatinho|2026-08-26": {
+    "media_id": "18144734464553834",
+    "posted_at": "2026-08-26T16:21:17.308496+00:00"
   },
   "fallback|direitos_passageiro|2026-08-24": {
     "media_id": "18141545890602835",
     "posted_at": "2026-08-24T14:57:10.805646+00:00"
+  },
+  "fallback|iata_icao|2026-08-25": {
+    "media_id": "17904500691507992",
+    "posted_at": "2026-08-25T14:02:46.306021+00:00"
+  },
+  "fallback|matricula_aeronave|2026-08-26": {
+    "media_id": "18090362648154124",
+    "posted_at": "2026-08-26T01:26:47.953225+00:00"
+  },
+  "fallback|o_que_e_notam|2026-08-25": {
+    "media_id": "18101893658209586",
+    "posted_at": "2026-08-25T20:33:01.117861+00:00"
+  },
+  "fallback|overbooking|2026-08-25": {
+    "media_id": "18075165866422222",
+    "posted_at": "2026-08-25T03:02:26.644065+00:00"
+  },
+  "fallback|rastreamento_voos|2026-08-26": {
+    "media_id": "17888490663674357",
+    "posted_at": "2026-08-26T05:37:39.762710+00:00"
   }
 }
