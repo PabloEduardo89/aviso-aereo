@@ -2,7 +2,7 @@
   "name": "opensky-proxy",
   "version": "1.0.0",
   "private": true,
-  "description": "Proxy Vercel Serverless Functions: guarda as credenciais OAuth2 do OpenSky Network e repassa chamadas à API para o app Aviso Aéreo (GitHub Pages, sem backend próprio). Hospedado no Vercel (não Cloudflare) porque o OpenSky bloqueia conexões vindas da rede do Cloudflare Workers.",
+  "description": "Proxy Vercel Serverless Functions pro app Aviso Aéreo (GitHub Pages, sem backend próprio): repassa tráfego ao vivo do adsb.lol (contorna CORS, rota /api/live, em uso) e guarda credenciais OAuth2 do OpenSky Network (rotas dormentes). Hospedado no Vercel (não Cloudflare) porque o OpenSky bloqueia conexões vindas da rede do Cloudflare Workers.",
   "scripts": {
     "dev": "vercel dev",
     "deploy": "vercel --prod"

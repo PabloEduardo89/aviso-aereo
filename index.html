@@ -566,7 +566,7 @@
   .source-tag.fallback .dot{ background: var(--amber); }
   .source-tag.fallback{ color: var(--amber); }
 
-  /* ---- Mapa ao Vivo (airplanes.live) ---- */
+  /* ---- Mapa ao Vivo (adsb.lol) ---- */
   .map-wrap{
     position: relative;
     height: min(70vh, 560px);
@@ -776,7 +776,7 @@
 <main id="main"></main>
 
 <div class="footnote">
-  Protótipo · METAR e satélite via API-REDEMET · NOTAM e ROTAER via API-AISWEB (DECEA) · Mapa ao Vivo conectado ao airplanes.live
+  Protótipo · METAR e satélite via API-REDEMET · NOTAM e ROTAER via API-AISWEB (DECEA) · Mapa ao Vivo conectado ao adsb.lol
 </div>
 
 <script>
@@ -2039,7 +2039,7 @@ let notamSummaryOpen = false;
    MAPA AO VIVO — funções (estado declarado mais abaixo,
    junto do resto do estado da aplicação)
    ========================================================= */
-const MAP_POLL_MS = 13000; // ~13s — folgado em relação ao limite do airplanes.live (1 req/s)
+const MAP_POLL_MS = 13000; // ~13s — folgado em relação ao limite informal do adsb.lol (1 req/s)
 
 // tile escuro de fundo (Mapa ao Vivo e mini-mapa de satélite do METAR) — usa Esri
 // Canvas/World_Dark_Gray_Base porque é gratuito e não exige chave de API; o CARTO
@@ -2108,9 +2108,9 @@ function handleMapVisibilityChange(){
   }
 }
 
-const AIRPLANES_LIVE_MAX_RADIUS_NM = 250; // limite do endpoint /point da API
+const LIVE_API_MAX_RADIUS_NM = 250; // limite do endpoint /point da API
 
-// a API do airplanes.live busca por ponto + raio (não por bbox como o OpenSky).
+// a API do adsb.lol busca por ponto + raio (não por bbox como o OpenSky).
 // Usamos o centro do mapa e a distância até o canto mais afastado como raio,
 // limitado a 250nm — em zooms bem afastados (ex.: Brasil inteiro visível) o
 // círculo cobre só a região central, não o mapa inteiro; é a troca aceita ao
@@ -2120,7 +2120,7 @@ function currentViewAsPointRadius(){
   const bounds = mapInstance.getBounds();
   const corner = bounds.getNorthEast();
   const radiusMeters = center.distanceTo(corner);
-  const radiusNm = Math.min(AIRPLANES_LIVE_MAX_RADIUS_NM, radiusMeters / 1852);
+  const radiusNm = Math.min(LIVE_API_MAX_RADIUS_NM, radiusMeters / 1852);
   return { lat: center.lat, lon: center.lng, radiusNm };
 }
 
@@ -2129,7 +2129,7 @@ async function fetchAircraftInView(){
   const { lat, lon, radiusNm } = currentViewAsPointRadius();
   try{
     const resp = await fetch(
-      `${AIRPLANES_LIVE_BASE}/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${radiusNm.toFixed(1)}`
+      liveApiUrl(`point/${lat.toFixed(4)}/${lon.toFixed(4)}/${radiusNm.toFixed(1)}`)
     );
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const json = await resp.json();
@@ -2137,7 +2137,7 @@ async function fetchAircraftInView(){
     mapLastUpdateAt = Date.now();
     mapHasError = false;
   }catch(err){
-    console.warn('Falha ao buscar tráfego aéreo do airplanes.live', err);
+    console.warn('Falha ao buscar tráfego aéreo (adsb.lol)', err);
     mapHasError = true;
   }finally{
     renderMapPanel();
@@ -2221,7 +2221,7 @@ function upsertAircraftMarker(a, now){
 // atualiza os marcadores por diff (posição/rumo dos existentes, remove os que
 // saíram da área, adiciona os novos) em vez de recriar tudo — evita "piscar"
 // o mapa a cada atualização. Formato de cada item: ver /point/[lat]/[lon]/[radius]
-// do airplanes.live (campo "ac" da resposta).
+// do adsb.lol (campo "ac" da resposta).
 function updateAircraftMarkers(aircraft){
   const seen = new Set();
   const now = Date.now();
@@ -2242,7 +2242,7 @@ function updateAircraftMarkers(aircraft){
   if(trackedHex) renderTrackedTrail();
 }
 
-/* ---- histórico de trajetória (client-side; airplanes.live não tem endpoint
+/* ---- histórico de trajetória (client-side; o adsb.lol não tem endpoint
    de trace na API pública — testado em /hex, /callsign e /reg, só devolvem
    a posição atual) ---- */
 const TRAIL_MAX_AGE_MS = 2 * 60 * 60 * 1000; // mantém só as últimas 2h de rastro
@@ -2288,7 +2288,7 @@ function setTrackedAircraft(hex){
 
 /* ---- busca de aeronave por callsign, registro ou ICAO24 (hex) ---- */
 async function fetchFirstAircraft(path){
-  const resp = await fetch(`${AIRPLANES_LIVE_BASE}${path}`);
+  const resp = await fetch(liveApiUrl(path));
   if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const json = await resp.json();
   return (json.ac && json.ac[0]) || null;
@@ -2302,9 +2302,9 @@ async function searchAircraft(query){
   try{
     const isHex = /^[0-9a-f]{6}$/i.test(q);
     let ac = isHex
-      ? await fetchFirstAircraft(`/hex/${q.toLowerCase()}`)
-      : await fetchFirstAircraft(`/callsign/${encodeURIComponent(q.toUpperCase())}`);
-    if(!ac && !isHex) ac = await fetchFirstAircraft(`/reg/${encodeURIComponent(q.toUpperCase())}`);
+      ? await fetchFirstAircraft(`hex/${q.toLowerCase()}`)
+      : await fetchFirstAircraft(`callsign/${encodeURIComponent(q.toUpperCase())}`);
+    if(!ac && !isHex) ac = await fetchFirstAircraft(`reg/${encodeURIComponent(q.toUpperCase())}`);
 
     if(!mapInstance) return; // aba fechada enquanto a busca estava em andamento
     if(!ac || ac.lat == null || ac.lon == null){
@@ -2489,7 +2489,7 @@ function renderMapaTab(main){
         <div class="map-fab" id="mapFab" title="Camadas e controles">⚙</div>
         <div class="map-panel" id="mapPanel"></div>
       </div>
-      <div class="map-attrib">Tráfego aéreo — airplanes.live · mapa © OpenStreetMap contributors © CARTO</div>
+      <div class="map-attrib">Tráfego aéreo — adsb.lol · mapa © Esri</div>
     `;
     initMap();
     document.getElementById('mapFab').onclick = toggleMapPanel;
@@ -2514,12 +2514,22 @@ let notamHistoricDate = null;   // 'YYYY-MM-DD' (Brasília)
 let notamRelevanceFilter = "all"; // 'all' | 'relevant' (esconde os "low"/informativos)
 
 /* =========================================================
-   MAPA AO VIVO — tráfego aéreo em tempo real (airplanes.live,
-   agregador comunitário de dados ADS-B/MLAT)
+   MAPA AO VIVO — tráfego aéreo em tempo real (adsb.lol, agregador
+   comunitário de dados ADS-B/MLAT — mesma família de API do
+   airplanes.live, que passou a exigir contato/autorização prévia)
    ========================================================= */
-// API pública, sem autenticação, CORS liberado (Access-Control-Allow-Origin: *)
-// — chamada direta do navegador, sem proxy. Ver https://airplanes.live/api-guide/
-const AIRPLANES_LIVE_BASE = "https://api.airplanes.live/v2";
+// o adsb.lol não devolve Access-Control-Allow-Origin, então o navegador
+// bloqueia a chamada direta (CORS) mesmo sem exigir autenticação — por isso
+// passa pelo proxy próprio em opensky-proxy/api/live.js. Preencha após rodar
+// o deploy (ver opensky-proxy/README.md): `vercel --prod` na pasta
+// opensky-proxy/ imprime uma URL tipo "https://opensky-proxy-xxxx.vercel.app"
+const LIVE_PROXY_BASE = ""; // TODO: preencher com a URL do deploy Vercel
+
+// monta a URL do proxy pra um caminho da API adsb.lol (sem "/" no início —
+// ex.: "point/-15.78/-47.93/50", "hex/e4803d", "callsign/TAM8111")
+function liveApiUrl(path){
+  return `${LIVE_PROXY_BASE}/api/live?p=${encodeURIComponent(path)}`;
+}
 
 let mapInstance = null;
 let mapPanelOpen = false;
