@@ -240,9 +240,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 12,
+    "fallback_topic_index": 13,
     "last_fallback_at": "2026-08-26T22:53:30+00:00",
-    "last_post_at": "2026-08-26T22:59:50+00:00",
+    "last_post_at": "2026-08-27T01:48:24.522074+00:00",
     "last_real_post_at": "2026-08-26T22:59:50+00:00"
   },
   "fallback|bagagem|2026-08-25": {
@@ -260,6 +260,10 @@
   "fallback|direitos_passageiro|2026-08-24": {
     "media_id": "18141545890602835",
     "posted_at": "2026-08-24T14:57:10.805646+00:00"
+  },
+  "fallback|fretar_vs_comprar_jato|2026-08-27": {
+    "media_id": "18088500809424327",
+    "posted_at": "2026-08-27T01:48:24.522074+00:00"
   },
   "fallback|iata_icao|2026-08-25": {
     "media_id": "17904500691507992",
