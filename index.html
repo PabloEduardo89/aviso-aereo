@@ -2520,10 +2520,9 @@ let notamRelevanceFilter = "all"; // 'all' | 'relevant' (esconde os "low"/inform
    ========================================================= */
 // o adsb.lol não devolve Access-Control-Allow-Origin, então o navegador
 // bloqueia a chamada direta (CORS) mesmo sem exigir autenticação — por isso
-// passa pelo proxy próprio em opensky-proxy/api/live.js. Preencha após rodar
-// o deploy (ver opensky-proxy/README.md): `vercel --prod` na pasta
-// opensky-proxy/ imprime uma URL tipo "https://opensky-proxy-xxxx.vercel.app"
-const LIVE_PROXY_BASE = ""; // TODO: preencher com a URL do deploy Vercel
+// passa pelo proxy próprio em opensky-proxy/api/live.js (deploy Vercel, ver
+// opensky-proxy/README.md)
+const LIVE_PROXY_BASE = "https://opensky-proxy-sigma.vercel.app";
 
 // monta a URL do proxy pra um caminho da API adsb.lol (sem "/" no início —
 // ex.: "point/-15.78/-47.93/50", "hex/e4803d", "callsign/TAM8111")
