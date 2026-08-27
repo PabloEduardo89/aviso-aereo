@@ -5,6 +5,37 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## Título de capa com QUANDO (dia + data + período do dia) — 2026-08-27
+
+Pedido do usuário, revendo o post que saiu: o título precisa deixar
+explícito quando a interferência ocorre, não só o quê — exemplo dado:
+"Aeroporto de Guarulhos pode ter voos cancelados **nesta tarde de
+quinta-feira, 27 de agosto**". `content._when_phrase(dt_utc)` gera essa
+frase (dia da semana + data por extenso + período do dia — madrugada/manhã/
+tarde/noite — calculados em horário de Brasília, não UTC) e todo template
+de `_TITLE_TEMPLATES["alto"]` agora inclui `{when}`. O datetime usado
+(`when_dt`, calculado em `build_post_content`) é:
+- **METAR**: sempre "agora" — a condição é uma leitura ao vivo, sem início
+  futuro pra referenciar.
+- **NOTAM**: o início da vigência (campo B) quando ainda está no futuro —
+  um aviso pra algo que vai COMEÇAR ("nesta tarde de sexta" pra um NOTAM que
+  só entra em vigor amanhã à tarde); senão "agora", já que o aviso já está
+  em vigor no momento em que o post sai (`content._notam_when_dt`).
+
+## Cadência do educativo: 6h desde o ÚLTIMO POST, real OU educativo (corrigido 2026-08-27, 2ª passada)
+
+**Bug encontrado e corrigido no mesmo dia da implementação original**: a
+primeira versão de `maybe_build_fallback` (run_cycle.py) só olhava
+`_meta.last_real_post_at` — isso fazia o educativo disparar a CADA execução
+(de hora em hora) durante uma seca de notícia real, não espaçado de 6 em 6h
+como pedido ("de 6 em 6 horas haverá um post educativo"). Corrigido pra usar
+o mais recente entre `last_real_post_at` **e** `last_fallback_at` — um post
+real OU um educativo, qualquer um dos dois, adia o próximo educativo por 6h.
+`run_cycle.run()` volta a atualizar `_meta.last_fallback_at` quando publica
+um post `_FALLBACK` (tinha sido removido na reescrita de mais cedo no
+mesmo dia — a versão nova simplesmente não estava sendo lida por
+`maybe_build_fallback`, que só checava `last_real_post_at`).
+
 ## Commit+push resiliente a push concorrente (corrigido 2026-08-27)
 
 **Causa raiz do incidente de 2026-08-26** (execução 33021086018 falhou): o

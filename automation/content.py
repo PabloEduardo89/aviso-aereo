@@ -13,6 +13,36 @@ from rules import HIGH_SEVERITY_KINDS, AirportEvaluation, MetarFields, parse_met
 
 BRT_OFFSET = timedelta(hours=-3)  # Brasília não observa horário de verão desde 2019
 
+# dia da semana + data + período do dia no título de capa dos posts de alerta —
+# pedido do usuário (2026-08-27): "Aeroporto de Guarulhos pode ter voos
+# cancelados NESTA TARDE DE QUINTA-FEIRA, 27 DE AGOSTO" — o título precisa
+# deixar explícito QUANDO a interferência ocorre, não só o quê. Ver _when_phrase.
+_WEEKDAY_PT = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+               "sexta-feira", "sábado", "domingo"]
+_MONTH_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
+             "agosto", "setembro", "outubro", "novembro", "dezembro"]
+
+
+def _period_of_day(hour: int) -> str:
+    if 0 <= hour < 6:
+        return "madrugada"
+    if 6 <= hour < 12:
+        return "manhã"
+    if 12 <= hour < 18:
+        return "tarde"
+    return "noite"
+
+
+def _when_phrase(dt_utc: datetime) -> str:
+    """'nesta tarde de quinta-feira, 27 de agosto', a partir de um datetime em
+    UTC — converte pra horário de Brasília antes de calcular dia/período,
+    porque é a partir daí que o dia muda pro público-alvo do post."""
+    local = dt_utc + BRT_OFFSET
+    period = _period_of_day(local.hour)
+    weekday = _WEEKDAY_PT[local.weekday()]
+    month = _MONTH_PT[local.month - 1]
+    return f"nesta {period} de {weekday}, {local.day} de {month}"
+
 # ordem de prioridade pra escolher o destaque principal do slide quando há vários motivos
 _HEADLINE_PRIORITY = [
     "rwy_closed", "twr_closed", "windshear", "thunderstorm", "severe_wx",
@@ -146,16 +176,20 @@ _DURATION_IMAGE_QUERY = "clock waiting airport"
 #
 # Encurtados em 2026-08-27 (regra "pouca escrita" nos slides — antes eram
 # frases longas o bastante pra estourar as 2 linhas do novo slide enxuto,
-# mesmo no menor tamanho de fonte aceito por _fit_title).
+# mesmo no menor tamanho de fonte aceito por _fit_title) e, na mesma data
+# (2ª passada), com {when} acrescentado — dia da semana, data e período do
+# dia por extenso, sempre presentes (ver _when_phrase), pedido explícito do
+# usuário depois de ver o título sem nenhuma indicação de QUANDO a
+# interferência ocorre.
 _TITLE_TEMPLATES = {
     "alto": [
-        "{Problema} em {city}: risco de atraso",
-        "{city}: {problema} pode atrasar seu voo",
-        "Alerta em {city} — {problema}",
-        "{Problema} ameaça voos em {city}",
-        "Vai voar para {city}? {problema} agora",
-        "{city} sob {problema}: atraso à vista",
-        "Passageiros de {city}: {problema} no radar",
+        "{Problema} em {city} {when}",
+        "{city}: {problema} {when}",
+        "Alerta em {city} {when} — {problema}",
+        "{Problema} pode afetar voos em {city} {when}",
+        "Vai voar para {city} {when}? {problema}",
+        "{city} sob {problema} {when}",
+        "Passageiros de {city}: {problema} {when}",
     ],
     "atenção": [
         "Aeroporto de {city}: {problema} pode atrasar ou alterar voos",
@@ -169,10 +203,10 @@ _TITLE_TEMPLATES = {
 }
 
 
-def _pick_cover_title(city: str, problema: str, severity: str) -> str:
+def _pick_cover_title(city: str, problema: str, severity: str, when: str) -> str:
     template = random.choice(_TITLE_TEMPLATES[severity])
     problema_cap = problema[0].upper() + problema[1:]
-    return template.format(city=city, problema=problema, Problema=problema_cap)
+    return template.format(city=city, problema=problema, Problema=problema_cap, when=when)
 
 
 _NAV_AID_NAME = {
@@ -275,21 +309,34 @@ def _causa_clause(headline_kind: str, fields: MetarFields | None, notam_hit) -> 
     return None
 
 
+def _parse_notam_field(s: str | None) -> datetime | None:
+    """Converte um campo B)/C) da AISWEB (YYMMDDHHmm, UTC) num datetime; None se vazio/inválido."""
+    if not s or len(s) < 10:
+        return None
+    try:
+        return datetime(2000 + int(s[0:2]), int(s[2:4]), int(s[4:6]), int(s[6:8]), int(s[8:10]), tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
 def _format_notam_validity(item: NotamItem) -> str | None:
     """'até dd/mm HH:MM (horário de Brasília)' ou 'sem previsão de término', a partir do campo C)."""
-    def parse(s):
-        if not s or len(s) < 10:
-            return None
-        try:
-            return datetime(2000 + int(s[0:2]), int(s[2:4]), int(s[4:6]), int(s[6:8]), int(s[8:10]), tzinfo=timezone.utc)
-        except ValueError:
-            return None
-
-    until = parse(item.valid_until)
+    until = _parse_notam_field(item.valid_until)
     if until is None:
         return None
     local = until + BRT_OFFSET
     return f"previsão de liberação: {local.day:02d}/{local.month:02d} às {local.hour:02d}:{local.minute:02d} (horário de Brasília)"
+
+
+def _notam_when_dt(item: NotamItem, now: datetime) -> datetime:
+    """Data/hora que deve aparecer no título de capa (ver _when_phrase): o
+    início da vigência (campo B), quando esse início ainda está no futuro —
+    um aviso pra algo que vai COMEÇAR; senão "agora", já que o aviso já está
+    em vigor no momento em que o post sai."""
+    valid_from = _parse_notam_field(item.valid_from)
+    if valid_from is not None and valid_from > now:
+        return valid_from
+    return now
 
 
 @dataclass
@@ -356,6 +403,7 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
         return []
 
     posts = []
+    now = datetime.now(timezone.utc)
 
     # --- post do clima: todos os motivos de METAR do momento juntos (é UMA
     # situação meteorológica só, não notícias separadas) ---
@@ -363,7 +411,7 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
         fields = parse_metar(metar.raw)
         kinds = [r.kind for r in evaluation.metar_reasons]
         bullets = [_metar_sentence(k, fields) for k in kinds]
-        hoje = (datetime.now(timezone.utc) + BRT_OFFSET).strftime("%Y-%m-%d")
+        hoje = (now + BRT_OFFSET).strftime("%Y-%m-%d")
         headline_kind = next(k for k in _HEADLINE_PRIORITY if k in kinds)
         dedup_key = f"{icao}|weather|{headline_kind}|{hoje}"
         posts.append(_build_one_post(
@@ -375,6 +423,7 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
             duracao_slide=None,
             updated_label_override=None,
             raw_snippet=metar.raw,
+            when_dt=now,  # condição meteorológica é sempre "agora" — não tem início futuro
         ))
 
     # --- um post por NOTAM relevante: cada NOTAM é a sua própria notícia,
@@ -399,13 +448,15 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
             duracao_slide=_format_notam_validity(hit.notam),
             updated_label_override="Aviso NOTAM ativo",
             raw_snippet=hit.notam.texto,
+            when_dt=_notam_when_dt(hit.notam, now),  # início da vigência, se ainda no futuro; senão "agora"
         ))
 
     return posts
 
 
 def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
-                     causa, cover_subtitle, duracao_slide, updated_label_override, raw_snippet) -> PostContent:
+                     causa, cover_subtitle, duracao_slide, updated_label_override, raw_snippet,
+                     when_dt) -> PostContent:
     """Monta um único PostContent (um card de notícia) a partir de um grupo de
     motivos que já foi decidido como pertencendo à mesma notícia — ou o grupo de
     condições de METAR do momento, ou um NOTAM específico. Ver build_post_content.
@@ -414,21 +465,28 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
     "explicativo" de layout diferente — são 2 ou 3 slides curtos, todos no
     mesmo molde CAPA: (1) manchete, (2) o que isso significa na prática, e (3)
     previsão/duração, só quando há uma data real de término (NOTAM com campo
-    C preenchido) — o METAR não tem essa data, então fica só com 2 slides."""
+    C preenchido) — o METAR não tem essa data, então fica só com 2 slides.
+
+    `when_dt` (UTC) é o momento que aparece no título — "nesta tarde de
+    quinta-feira, 27 de agosto" — pedido do usuário (2ª passada no mesmo dia):
+    o título precisa deixar explícito QUANDO a interferência ocorre, não só
+    o quê (ver _when_phrase e build_post_content, que decide esse datetime:
+    "agora" pra METAR, início da vigência futura ou "agora" pra NOTAM)."""
     headline = _HEADLINE_LABEL[headline_kind]
     severity = "alto" if headline_kind in HIGH_SEVERITY_KINDS else "atenção"
     updated_label = updated_label_override or (_metar_updated_label(metar) if metar else "Aviso NOTAM ativo")
 
     # título de capa: sorteado entre vários formatos (ver _TITLE_TEMPLATES) pra
     # não repetir sempre a mesma estrutura — só a consequência prática
-    # (atraso/cancelamento/alteração de voo) e a cidade são garantidas; a
-    # palavra "aeroporto" aparece em parte dos templates, não em todos
-    # (pedido explícito do usuário, 2026-08-24, depois de notar um "título
-    # padrão" repetido demais no feed real).
+    # (atraso/cancelamento/alteração de voo), a cidade e o QUANDO são
+    # garantidos; a palavra "aeroporto" aparece em parte dos templates, não em
+    # todos (pedido explícito do usuário, 2026-08-24, depois de notar um
+    # "título padrão" repetido demais no feed real).
     problema = _HEADLINE_LABEL_SENTENCE[headline_kind][0].lower() + _HEADLINE_LABEL_SENTENCE[headline_kind][1:]
     if causa:
         problema += f" {causa}"
-    cover_title = _pick_cover_title(airport['city'], problema, severity)
+    when = _when_phrase(when_dt)
+    cover_title = _pick_cover_title(airport['city'], problema, severity, when)
 
     background_category = "weather" if headline_kind in WEATHER_KINDS else _ILLUSTRATION_BY_KIND[headline_kind]
 

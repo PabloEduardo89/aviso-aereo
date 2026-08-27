@@ -80,16 +80,21 @@ def collect_candidates(state: dict) -> list:
 
 
 def maybe_build_fallback(state: dict, now: datetime) -> object | None:
-    """Devolve 1 PostContent educativo (ver fallback_content.py) se já faz tempo
-    demais (MIN_FALLBACK_INTERVAL_SECONDS, 6h) desde o ÚLTIMO POST REAL — regra
-    atualizada 2026-08-27: antes o relógio era contado desde o último EDUCATIVO
-    (disparava sempre, de 4 em 4h, mesmo em dia cheio de notícia real); agora só
-    é contado desde o último post real (`_meta.last_real_post_at`), então um dia
-    cheio de avisos reais não força educativo nenhum, mas uma seca de notícias
-    reais mantém a conta ativa com curiosidades. Devolve None se ainda não é
-    hora — ou se nunca houve nenhum post real, considera que já é hora (evita
-    nunca ligar o fallback num lançamento sem histórico)."""
-    last_iso = get_meta(state, "last_real_post_at")
+    """Devolve 1 PostContent educativo (ver fallback_content.py) se já faz
+    MIN_FALLBACK_INTERVAL_SECONDS (6h) sem NENHUM post sair — real ou
+    educativo — regra corrigida em 2026-08-27 (segunda passada no dia):
+    a primeira versão só olhava `_meta.last_real_post_at`, o que fazia o
+    educativo disparar a CADA execução (de hora em hora) durante uma seca de
+    notícia real, em vez de espaçado de 6 em 6h como pedido ("de 6 em 6 horas
+    haverá um post educativo"). Agora o relógio usa o mais recente entre
+    `last_real_post_at` e `last_fallback_at` — um post real OU um educativo,
+    qualquer um dos dois, adia o próximo educativo por 6h. Devolve None se
+    ainda não é hora — ou se nunca houve nenhum post (real nem educativo),
+    considera que já é hora (evita nunca ligar o fallback num lançamento sem
+    histórico)."""
+    last_real = get_meta(state, "last_real_post_at")
+    last_fallback = get_meta(state, "last_fallback_at")
+    last_iso = max(filter(None, [last_real, last_fallback]), default=None)
     if last_iso is not None:
         elapsed = (now - datetime.fromisoformat(last_iso)).total_seconds()
         if elapsed < MIN_FALLBACK_INTERVAL_SECONDS:
@@ -146,8 +151,10 @@ def run():
         posted_at = datetime.now(timezone.utc).isoformat()
         mark_posted(state, post.dedup_key, media_id, posted_at)
         set_meta(state, "last_post_at", posted_at)
-        if post.icao != "_FALLBACK":
-            set_meta(state, "last_real_post_at", posted_at)  # zera o relógio do educativo obrigatório (6h)
+        if post.icao == "_FALLBACK":
+            set_meta(state, "last_fallback_at", posted_at)  # espaça o PRÓXIMO educativo por 6h
+        else:
+            set_meta(state, "last_real_post_at", posted_at)  # espaça o PRÓXIMO educativo por 6h também
         save_state(state)  # salva a cada post — se o job cair no meio, o que já saiu fica registrado
         posted_count += 1
         print(f"[{post.icao}] publicado: media_id={media_id}")
