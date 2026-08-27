@@ -52,12 +52,13 @@ _FONT_AXES = {
 
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 
-# rotação de palavras-chave pro fundo do slide de CTA — genéricas o bastante
+# rotação de palavras-chave (em INGLÊS — o Pexels responde melhor, ver
+# content._IMPACT_IMAGE_QUERY) pro fundo do slide de CTA — genéricas o bastante
 # pra caber em qualquer post, mas ainda assim uma foto REAL e específica (não
 # reaproveita a foto de nenhum outro slide do carrossel)
 _CTA_IMAGE_QUERIES = [
-    "céu pôr do sol avião", "aeroporto pista noite", "avião decolando nuvens",
-    "torre de controle pôr do sol", "janela avião nuvens",
+    "sunset sky airplane", "airport runway night", "airplane takeoff clouds",
+    "control tower sunset", "airplane window clouds",
 ]
 
 

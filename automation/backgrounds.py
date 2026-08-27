@@ -176,6 +176,7 @@ _GENERIC_CATEGORY_BY_KIND = {
     "edu_registration": "aircraft",
     "edu_jets": "aircraft",
     "edu_careers": "terminal",
+    "edu_destinations": "aircraft",
 }
 _DEFAULT_GENERIC_CATEGORY = "aircraft"
 

@@ -115,24 +115,27 @@ _IMPACT_TITLE = {
     "navaid_us": "Aproximação fica mais exigente — mais chance de atraso",
 }
 
-# palavra-chave pra buscar a foto do 2º slide (impacto) no Pexels — reforça
-# visualmente o que aquele headline_kind representa (ver slide.py/backgrounds.py)
+# palavra-chave (em INGLÊS — o Pexels responde muito melhor a buscas em inglês
+# do que em português, testado empiricamente em 2026-08-27: a mesma consulta em
+# português ocasionalmente traz foto sem nenhuma relação com o tema) pra buscar
+# a foto do 2º slide (impacto) no Pexels — reforça visualmente o que aquele
+# headline_kind representa (ver slide.py/backgrounds.py)
 _IMPACT_IMAGE_QUERY = {
-    "rwy_closed": "pista fechada aeroporto",
-    "twr_closed": "torre controle aeroporto",
-    "windshear": "vento forte tempestade avião",
-    "thunderstorm": "trovoada relâmpago",
-    "severe_wx": "tempo severo chuva forte",
-    "convective": "nuvens tempestade escuras",
-    "freezing": "gelo geada inverno",
-    "low_vis": "neblina nevoeiro estrada",
-    "obscured": "neblina densa cidade",
-    "low_ceiling": "nuvens baixas céu cinza",
-    "strong_wind": "vento forte árvore",
-    "navaid_us": "radar antena tecnologia",
+    "rwy_closed": "closed runway airport",
+    "twr_closed": "airport control tower",
+    "windshear": "storm strong wind airplane",
+    "thunderstorm": "thunderstorm lightning",
+    "severe_wx": "severe weather heavy rain",
+    "convective": "dark storm clouds",
+    "freezing": "ice frost winter",
+    "low_vis": "fog mist road",
+    "obscured": "dense fog city",
+    "low_ceiling": "low clouds gray sky",
+    "strong_wind": "strong wind tree",
+    "navaid_us": "radar antenna technology",
 }
-# palavra-chave pra buscar a foto do 3º slide (previsão/duração), quando existe
-_DURATION_IMAGE_QUERY = "relógio espera aeroporto"
+# palavra-chave (inglês) pra buscar a foto do 3º slide (previsão/duração), quando existe
+_DURATION_IMAGE_QUERY = "clock waiting airport"
 
 # títulos de capa variados — "aeroporto", "atraso", "cancelamento" etc. são
 # EXEMPLOS de palavra-chave, não uma regra fixa por post (pedido do usuário,

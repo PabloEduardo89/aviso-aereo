@@ -5,6 +5,63 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## Palavra-chave de imagem: sempre em INGLÊS, nunca português (lição 2026-08-27)
+
+Testado empiricamente: o Pexels responde muito melhor a `image_query` em
+inglês do que em português. Uma busca por "mecânico avião ferramenta
+trabalho" trouxe, entre os primeiros resultados, uma foto de rua de Florença
+sem nenhuma relação com aviação; a mesma ideia em inglês ("aircraft mechanic
+aviation maintenance") trouxe 8 de 8 fotos perfeitamente no tema. Não é
+100% inconsistente — algumas palavras em português (ex.: "trovoada",
+"relâmpago") funcionaram bem — mas o inglês é sistematicamente mais
+confiável. **Toda `image_query` nova em `content.py`, `slide.py` e
+`fallback_content.py` deve ser escrita em inglês**, mesmo com todo o resto
+do conteúdo (kicker, título, legenda) em português. Não voltar a escrever
+`image_query` em português.
+
+## Vagas reais de emprego nos posts de carreira (2026-08-27)
+
+Pedido do usuário: "sempre que possível anunciando vagas de trabalho e/ou
+oportunidades reais na área" (piloto, mecânico, comissário). Implementado em
+`jobs.py` — busca AO VIVO (não é conteúdo estático) via RSS público e
+gratuito do JSfirm.com, sem chave/autenticação. Confirmado funcionando pra
+`mechanic` e `flight_attendant` (`jobs.JOB_FEEDS`); não achamos uma categoria
+de PILOTO que funcionasse nesse serviço (vários nomes de categoria testados,
+todos vazios) — `carreira_piloto` continua só com um slide estático
+apontando onde procurar (LinkedIn, JSfirm, site de cada companhia), sem vaga
+ao vivo. Se algum dia surgir uma fonte de vaga de piloto (JSfirm com a
+categoria certa, ou outro serviço), acrescentar em `jobs.JOB_FEEDS` e
+declarar `job_categories=["pilot"]` no `Topic` de piloto.
+
+`Topic.job_categories` (fallback_content.py) é a lista de categorias
+(`jobs.JOB_FEEDS`) que um tópico busca — hoje só `carreira_comissario_mecanico`
+usa isso (`["flight_attendant", "mechanic"]`). `build_fallback_post` busca 1
+vaga real por categoria e, se achar, acrescenta 1 slide extra ("VAGA REAL ·
+{CATEGORIA}") no fim do carrossel + o link de verdade na legenda. Se a busca
+falhar (feed fora do ar, categoria sem vaga no momento), o slide
+correspondente simplesmente não aparece — nunca quebra o post por causa
+disso. Como o JSfirm é americano, os slides de vaga são sempre enquadrados
+como "oportunidade internacional" — não achamos, até agora, uma fonte de
+vagas de aviação BRASILEIRA com feed público estável (Tripulantes Brasil,
+por exemplo, é um site em Next.js sem RSS/API pública acessível sem login).
+
+## Novos temas educativos: destinos incríveis + mais jatinhos (2026-08-27)
+
+Pedido do usuário: mais conteúdo de "interesse luxuoso" — lugares incríveis/
+pouco visitados do mundo e mais curiosidades de jato particular. Adicionados
+7 tópicos novos (de 14 pra 21 no total):
+
+- **`edu_destinations`** (categoria nova): `aeroportos_mais_dificeis`,
+  `ilhas_dificeis_chegar`, `destinos_jato_particular`,
+  `rotas_exoticas_comerciais` — sempre com ângulo de AVIAÇÃO (aeroporto mais
+  difícil de pousar, ilha que só avião pequeno alcança, rota comercial mais
+  cênica), não virou conta de viagem genérica.
+- **`edu_jets`** (categoria já existente, 3 tópicos a mais):
+  `fretar_vs_comprar_jato`, `recordes_jato_executivo`,
+  `manutencao_jato_executivo` — evitado citar pessoas reais/famosas donas de
+  jato específico (privacidade/precisão); os recordes citados são de modelo
+  de aeronave, não de indivíduo.
+
 ## Redesign completo do carrossel — slide único + CTA (2026-08-27)
 
 **Supera a seção "Referência de estilo: feed do G1" abaixo** (mantida por
