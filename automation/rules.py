@@ -25,6 +25,16 @@ MIN_CEILING_FT = 200         # teto (BKN/OVC) abaixo disso: próximo do DH típi
 STRONG_WIND_KT = 25          # vento médio sustentado a partir daqui já preocupa a maioria das operações
 STRONG_GUST_KT = 35          # rajada a partir daqui
 
+# só estes kinds representam risco real de atraso/cancelamento/desvio ("quente") — os
+# demais (visibilidade/teto marginal, vento forte mas não severo, auxílio de navegação
+# fora do ar) são reais mas geralmente contornáveis ("morno") e, a partir de 2026-08-27
+# (pedido do usuário: "não quero mais avisos mornos"), não geram post nenhum — só
+# entram na narrativa quando aparecem JUNTO com um motivo quente (ver evaluate_metar/
+# evaluate_notam, que já filtram por este conjunto antes de devolver as reasons)
+HIGH_SEVERITY_KINDS = {
+    "rwy_closed", "twr_closed", "windshear", "thunderstorm", "severe_wx", "freezing", "convective", "obscured",
+}
+
 CLOUD_NAMES = {"FEW": "Poucas nuvens", "SCT": "Nuvens esparsas", "BKN": "Nublado", "OVC": "Encoberto"}
 WX_PHEN_LABEL = {
     "DZ": "garoa", "RA": "chuva", "SN": "neve", "SG": "grãos de neve", "IC": "cristais de gelo",
@@ -287,17 +297,25 @@ class AirportEvaluation:
 
 
 def evaluate_airport(icao: str, metar: MetarResult | None, notams: list) -> AirportEvaluation:
+    """Só chega aqui (e vira post) quem tem pelo menos 1 motivo em HIGH_SEVERITY_KINDS
+    — risco real de atraso/cancelamento/desvio ("quente"). Restrição real mas
+    geralmente contornável (visibilidade/teto marginal, vento forte mas não
+    severo, auxílio de navegação fora do ar) NÃO vira post sozinha desde
+    2026-08-27 (pedido do usuário: "não quero mais avisos mornos") — o filtro
+    é aplicado aqui, na origem, pra ninguém rio abaixo (content.py) precisar
+    saber lidar com motivo morno nenhum."""
     metar_reasons = []
     if metar is not None:
-        metar_reasons = evaluate_metar(parse_metar(metar.raw)).reasons
+        metar_reasons = [r for r in evaluate_metar(parse_metar(metar.raw)).reasons if r.kind in HIGH_SEVERITY_KINDS]
 
     notam_hits = []
     for item in notams:
         if not is_notam_active(item):
             continue
         ev = evaluate_notam(item)
-        if ev.relevant:
-            notam_hits.append(NotamHit(notam=item, reasons=ev.reasons))
+        high_reasons = [r for r in ev.reasons if r.kind in HIGH_SEVERITY_KINDS]
+        if high_reasons:
+            notam_hits.append(NotamHit(notam=item, reasons=high_reasons))
 
     return AirportEvaluation(
         icao=icao,

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from fetch_data import MetarResult, NotamItem
-from rules import AirportEvaluation, MetarFields, parse_metar
+from rules import HIGH_SEVERITY_KINDS, AirportEvaluation, MetarFields, parse_metar
 
 BRT_OFFSET = timedelta(hours=-3)  # Brasília não observa horário de verão desde 2019
 
@@ -49,11 +49,6 @@ _HEADLINE_LABEL_SENTENCE = {
     "strong_wind": "Vento forte",
     "navaid_us": "Auxílio de navegação inativo",
 }
-# "alto" = risco de cancelamento/desvio; "atencao" = restrição real mas geralmente contornável
-_HIGH_SEVERITY_KINDS = {
-    "rwy_closed", "twr_closed", "windshear", "thunderstorm", "severe_wx", "freezing", "convective", "obscured",
-}
-
 # kinds cuja causa vem do clima (fundo de capa = satélite) vs. da operação do aeródromo (fundo = ilustração)
 WEATHER_KINDS = {
     "low_vis", "low_ceiling", "obscured", "strong_wind", "windshear",
@@ -102,22 +97,62 @@ _IMPACT_TEXT = {
         "exigente — o que aumenta a chance de atraso ou desvio do seu voo em dias de tempo ruim.",
 }
 
+# versão CURTA do mesmo impacto acima — vira o título do 2º slide do carrossel (a
+# legenda continua usando o texto completo de _IMPACT_TEXT). Regra do usuário
+# (2026-08-27): "pouca escrita" nos slides — título de até 2 linhas, não parágrafo.
+_IMPACT_TITLE = {
+    "rwy_closed": "Seu voo pode atrasar, remarcar ou desviar",
+    "twr_closed": "Voos podem atrasar ou ficar suspensos",
+    "windshear": "Piloto pode precisar arremeter e tentar de novo",
+    "thunderstorm": "Voos podem esperar no ar ou ser desviados",
+    "severe_wx": "Decolagem pode atrasar ou o voo desviar",
+    "convective": "Risco real de atraso, espera no ar ou desvio",
+    "freezing": "Degelo da aeronave atrasa o seu embarque",
+    "low_vis": "Só pousos por instrumento avançado funcionam agora",
+    "obscured": "Só pousos por instrumento avançado funcionam agora",
+    "low_ceiling": "Aproximação visual fica mais difícil",
+    "strong_wind": "Piloto pode arremeter ou o voo atrasar",
+    "navaid_us": "Aproximação fica mais exigente — mais chance de atraso",
+}
+
+# palavra-chave pra buscar a foto do 2º slide (impacto) no Pexels — reforça
+# visualmente o que aquele headline_kind representa (ver slide.py/backgrounds.py)
+_IMPACT_IMAGE_QUERY = {
+    "rwy_closed": "pista fechada aeroporto",
+    "twr_closed": "torre controle aeroporto",
+    "windshear": "vento forte tempestade avião",
+    "thunderstorm": "trovoada relâmpago",
+    "severe_wx": "tempo severo chuva forte",
+    "convective": "nuvens tempestade escuras",
+    "freezing": "gelo geada inverno",
+    "low_vis": "neblina nevoeiro estrada",
+    "obscured": "neblina densa cidade",
+    "low_ceiling": "nuvens baixas céu cinza",
+    "strong_wind": "vento forte árvore",
+    "navaid_us": "radar antena tecnologia",
+}
+# palavra-chave pra buscar a foto do 3º slide (previsão/duração), quando existe
+_DURATION_IMAGE_QUERY = "relógio espera aeroporto"
+
 # títulos de capa variados — "aeroporto", "atraso", "cancelamento" etc. são
 # EXEMPLOS de palavra-chave, não uma regra fixa por post (pedido do usuário,
 # 2026-08-24, depois de notar um "título padrão" repetido demais no feed). Um
 # template é sorteado por post; "aeroporto" aparece em parte deles (pode ser
 # mais frequente que as outras palavras-chave), mas não em todos. Ver
 # `_pick_cover_title`.
+#
+# Encurtados em 2026-08-27 (regra "pouca escrita" nos slides — antes eram
+# frases longas o bastante pra estourar as 2 linhas do novo slide enxuto,
+# mesmo no menor tamanho de fonte aceito por _fit_title).
 _TITLE_TEMPLATES = {
     "alto": [
-        "Aeroporto de {city}: {problema} pode causar atraso ou cancelamento de voos",
-        "{Problema} em {city} — passageiros podem ter voo atrasado ou desviado",
-        "Voos para {city} podem atrasar ou ser cancelados: {problema}",
-        "Alerta no aeroporto de {city}: {problema} pode alterar seu voo",
-        "{city} enfrenta {problema} — atraso ou desvio de voo é o risco agora",
-        "Passageiro de {city}, atenção: {problema} ameaça atrasar ou cancelar seu voo",
-        "{Problema} no aeroporto de {city}: chance real de atraso ou desvio",
-        "Vai voar para {city}? {problema} pode atrasar ou cancelar seu voo",
+        "{Problema} em {city}: risco de atraso",
+        "{city}: {problema} pode atrasar seu voo",
+        "Alerta em {city} — {problema}",
+        "{Problema} ameaça voos em {city}",
+        "Vai voar para {city}? {problema} agora",
+        "{city} sob {problema}: atraso à vista",
+        "Passageiros de {city}: {problema} no radar",
     ],
     "atenção": [
         "Aeroporto de {city}: {problema} pode atrasar ou alterar voos",
@@ -255,16 +290,18 @@ def _format_notam_validity(item: NotamItem) -> str | None:
 
 
 @dataclass
-class ExplicativoContent:
-    subtitulo: str            # aeroporto — ex.: "Confins (Belo Horizonte) — SBCF"
-    o_que_aconteceu: str       # prosa corrida juntando os motivos
-    o_que_significa: str       # texto de impacto (ver _IMPACT_TEXT)
-    duracao_prevista: str | None
-    raw_snippet: str           # texto bruto (METAR ou NOTAM) pro card de rodapé; "" oculta o card (ver fallback_content.py)
-    heading_1: str = "O QUE ACONTECEU:"      # sobrescrito pelo fallback_content.py (posts educativos)
-    heading_2: str = "O QUE ISSO SIGNIFICA:"
-    raw_snippet_label: str = "REGISTRO BRUTO (METAR/NOTAM)"
-    contexto: str | None = None  # parágrafo de abertura — situa a notícia e cita a fonte (DECEA)
+class SlideSpec:
+    """Conteúdo de UM slide do carrossel — todo slide segue o mesmo molde visual
+    (foto + degradê + kicker + título curto, ver slide.render_photo_slide), desde
+    a mudança de 2026-08-27 que aboliu o layout separado de "explicativo" (fundo
+    branco/serifado)."""
+    kicker_text: str          # etiqueta curta acima do título (categoria/contexto)
+    title: str                 # texto curto do slide — regra "pouca escrita": no máximo 2 linhas
+    subtitle: str | None = None      # linha secundária opcional (dado complementar curto)
+    image_query: str | None = None   # None = usa o fundo "oficial" do post (foto curada do aeroporto/
+    # satélite/ilustração — reservado pro 1º slide); uma string busca uma foto REAL no Pexels por essa
+    # palavra-chave — cada slide usa a palavra-chave que combina com o QUE ELE DIZ, nunca repete a
+    # mesma foto de outro slide do mesmo carrossel (regra do usuário, 2026-08-27)
 
 
 @dataclass
@@ -274,20 +311,16 @@ class PostContent:
     uf: str
     headline: str            # ex.: "PISTA FECHADA" (rótulo curto, usado em logs/selo)
     headline_kind: str        # ex.: "rwy_closed" — usado por backgrounds.py pra escolher a foto genérica mais pertinente
-    severity: str             # "alto", "atenção" ou "informativo" (posts educativos de fallback — ver fallback_content.py)
-    bullets: list             # frases naturais, uma por motivo
-    updated_label: str        # ex.: "METAR das 18:00 UTC (15:00 em Brasília)"
-    caption: str              # texto completo pra legenda do Instagram
-    cover_title: str           # título grande do slide CAPA, ex.: "PISTA FECHADA EM CONGONHAS POR MANUTENÇÃO"
-    cover_subtitle: str | None  # linha secundária opcional do slide CAPA (horário/duração)
-    background_category: str    # "weather" (fundo = satélite) ou uma chave de ilustração (ver _ILLUSTRATION_BY_KIND)
-    needs_explicativo: bool      # True quando um único slide de capa não é suficiente
-    explicativo: ExplicativoContent | None
+    severity: str             # "alto" ou "informativo" (posts educativos de fallback — ver fallback_content.py).
+    # "atenção" não é mais alcançável em post real desde 2026-08-27: rules.py só deixa passar reasons de
+    # HIGH_SEVERITY_KINDS (só avisos "quentes", nunca mais "mornos" — pedido explícito do usuário).
+    caption: str              # texto completo pra legenda do Instagram (mantém o detalhe técnico/impacto
+    # completo, mesmo os slides sendo enxutos — quem quiser o "porquê" completo lê a legenda)
+    slides: list              # list[SlideSpec] — conteúdo de CADA slide de verdade do carrossel, sem contar
+    # o slide de Call-to-Action final, que slide.render_post_slides sempre acrescenta por conta própria
+    background_category: str    # fundo do slide[0] — "weather" (satélite) ou uma chave de ilustração
+    # (ver _ILLUSTRATION_BY_KIND); só usado quando slides[0].image_query é None
     dedup_key: str            # identifica a condição pra automação não postar a mesma coisa 2x (ver state.py)
-    kicker_text: str | None = None  # sobrescreve o kicker padrão "{icao} · {uf}" (usado pelo fallback educativo)
-    explicativo_slides: list | None = None  # lista de ExplicativoContent extra — carrossel com MAIS de 1 slide
-    # explicativo (hoje só o fallback educativo usa: capa + 2 explicativos = 3 slides). Quando presente,
-    # slide.py.render_post_slides ignora `explicativo` (singular) e renderiza um slide por item da lista.
 
 
 def _metar_updated_label(metar: MetarResult) -> str:
@@ -334,7 +367,10 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
             icao, airport, metar, bullets, headline_kind, dedup_key,
             causa=_causa_clause(headline_kind, fields, None),
             cover_subtitle=f"Atualizado {metar_local_time_short(metar)}" if metar else None,
-            duracao_prevista="Reavaliado a cada novo boletim METAR (de hora em hora)",
+            # o METAR é reavaliado a cada boletim (de hora em hora) — não tem uma
+            # data de término fixa como um NOTAM, então não vira slide de previsão
+            duracao_slide=None,
+            updated_label_override=None,
             raw_snippet=metar.raw,
         ))
 
@@ -357,7 +393,8 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
             icao, airport, metar, bullets, headline_kind, dedup_key,
             causa=_causa_clause(headline_kind, None, hit),
             cover_subtitle=_format_notam_validity(hit.notam),
-            duracao_prevista=_format_notam_validity(hit.notam),
+            duracao_slide=_format_notam_validity(hit.notam),
+            updated_label_override="Aviso NOTAM ativo",
             raw_snippet=hit.notam.texto,
         ))
 
@@ -365,13 +402,19 @@ def build_post_content(icao: str, airport: dict, metar: MetarResult | None,
 
 
 def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
-                     causa, cover_subtitle, duracao_prevista, raw_snippet) -> PostContent:
+                     causa, cover_subtitle, duracao_slide, updated_label_override, raw_snippet) -> PostContent:
     """Monta um único PostContent (um card de notícia) a partir de um grupo de
     motivos que já foi decidido como pertencendo à mesma notícia — ou o grupo de
-    condições de METAR do momento, ou um NOTAM específico. Ver build_post_content."""
+    condições de METAR do momento, ou um NOTAM específico. Ver build_post_content.
+
+    Desde 2026-08-27 (pedido do usuário), o carrossel não tem mais um slide
+    "explicativo" de layout diferente — são 2 ou 3 slides curtos, todos no
+    mesmo molde CAPA: (1) manchete, (2) o que isso significa na prática, e (3)
+    previsão/duração, só quando há uma data real de término (NOTAM com campo
+    C preenchido) — o METAR não tem essa data, então fica só com 2 slides."""
     headline = _HEADLINE_LABEL[headline_kind]
-    severity = "alto" if headline_kind in _HIGH_SEVERITY_KINDS else "atenção"
-    updated_label = _metar_updated_label(metar) if metar else "Aviso NOTAM ativo"
+    severity = "alto" if headline_kind in HIGH_SEVERITY_KINDS else "atenção"
+    updated_label = updated_label_override or (_metar_updated_label(metar) if metar else "Aviso NOTAM ativo")
 
     # título de capa: sorteado entre vários formatos (ver _TITLE_TEMPLATES) pra
     # não repetir sempre a mesma estrutura — só a consequência prática
@@ -386,25 +429,31 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
 
     background_category = "weather" if headline_kind in WEATHER_KINDS else _ILLUSTRATION_BY_KIND[headline_kind]
 
-    contexto = (
-        f"A AvisoAereo acompanha em tempo real os boletins oficiais do DECEA (REDEMET/AISWEB) "
-        f"nos principais aeroportos do Brasil. Agora é a vez do Aeroporto de {airport['city']} ({icao}):"
-    )
+    slides = [
+        SlideSpec(
+            kicker_text=f"{icao} · {airport['uf']}",
+            title=cover_title,
+            subtitle=cover_subtitle,
+            image_query=None,  # usa o fundo "oficial" do post — foto curada do aeroporto/satélite/ilustração
+        ),
+        SlideSpec(
+            kicker_text="O QUE ISSO SIGNIFICA",
+            title=_IMPACT_TITLE.get(headline_kind, "Seu voo pode ser afetado"),
+            image_query=_IMPACT_IMAGE_QUERY.get(headline_kind, "aeroporto avião pista"),
+        ),
+    ]
+    if duracao_slide:
+        slides.append(SlideSpec(
+            kicker_text="PREVISÃO",
+            title=duracao_slide[0].upper() + duracao_slide[1:],
+            image_query=_DURATION_IMAGE_QUERY,
+        ))
 
-    explicativo = ExplicativoContent(
-        subtitulo=f"{airport['city']} — {icao}",
-        o_que_aconteceu=" ".join(bullets),
-        o_que_significa=_IMPACT_TEXT.get(headline_kind, ""),
-        duracao_prevista=duracao_prevista,
-        raw_snippet=raw_snippet,
-        contexto=contexto,
-    )
-
-    # o "o que isso significa" sempre aparece — na legenda, e também no slide
-    # explicativo — pra quem não entende de aviação conseguir dimensionar o
-    # impacto prático (não só o jargão técnico dos bullets acima)
+    # a legenda continua trazendo o detalhe técnico completo (bullets + impacto
+    # por extenso) — os slides ficam enxutos, mas quem quiser o "porquê" lê a
+    # legenda (regra "sempre explicar o impacto prático" segue valendo, só que
+    # agora prioritariamente na legenda em vez de num slide de texto corrido)
     impacto = _IMPACT_TEXT.get(headline_kind, "")
-
     caption_lines = [
         f"⚠️ {headline} em {airport['city']} ({icao})",
         "",
@@ -428,14 +477,9 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
         headline=headline,
         headline_kind=headline_kind,
         severity=severity,
-        bullets=bullets,
-        updated_label=updated_label,
         caption="\n".join(caption_lines),
-        cover_title=cover_title,
-        cover_subtitle=cover_subtitle,
+        slides=slides,
         background_category=background_category,
-        needs_explicativo=True,
-        explicativo=explicativo,
         dedup_key=dedup_key,
     )
 
@@ -462,16 +506,11 @@ if __name__ == "__main__":
         evaluation = evaluate_airport(icao, metar, notams)
         for post in build_post_content(icao, airport, metar, evaluation):
             print(f"=== {post.headline} — {post.severity.upper()} — {post.city}/{post.uf} ({post.icao}) — {post.dedup_key} ===")
-            print(f"CAPA titulo: {post.cover_title}")
-            print(f"CAPA subtitulo: {post.cover_subtitle}")
-            print(f"fundo: {post.background_category} | explicativo? {post.needs_explicativo}")
-            if post.explicativo:
-                e = post.explicativo
-                print(f"  [explicativo] {e.subtitulo}")
-                print(f"  o que aconteceu: {e.o_que_aconteceu}")
-                print(f"  o que significa: {e.o_que_significa}")
-                print(f"  duracao prevista: {e.duracao_prevista}")
-                print(f"  raw: {e.raw_snippet}")
+            print(f"fundo do 1º slide: {post.background_category}")
+            for i, s in enumerate(post.slides, start=1):
+                print(f"  slide {i}: [{s.kicker_text}] {s.title}"
+                      f"{' | ' + s.subtitle if s.subtitle else ''}"
+                      f" (foto: {s.image_query or 'oficial do post'})")
             print("--- legenda ---")
             print(post.caption)
             print()

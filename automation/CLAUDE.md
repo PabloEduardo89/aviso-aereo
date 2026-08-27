@@ -5,10 +5,72 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
-## Referência de estilo: feed do G1 no Instagram
+## Redesign completo do carrossel — slide único + CTA (2026-08-27)
+
+**Supera a seção "Referência de estilo: feed do G1" abaixo** (mantida por
+histórico) — o usuário pediu pra acabar de vez com a distinção entre slide
+CAPA (foto) e slide EXPLICATIVO (fundo branco/serifado): agora **todo** slide
+do carrossel, sem exceção, segue o molde fotográfico (era só a capa antes).
+Motivo do pedido: "pouca escrita, imagens reais, excelente edição" — o texto
+corrido do explicativo antigo foi condensado em títulos curtos, um por slide.
+
+- **Um único renderizador** (`slide.render_photo_slide`) pra todo slide —
+  substituiu `render_capa_slide`/`render_explicativo_slide`, que não existem
+  mais.
+- **Selo `@avisoaereo` bem mais em destaque**: centralizado no topo, fundo
+  sólido âmbar (`COLOR_BRAND`, mesmo tom do app principal), em vez do badge
+  pequeno/semitransparente de antes — presente em TODO slide, inclusive os
+  que antes não tinham selo nenhum (os explicativos).
+- **Título curto, no máximo 2 linhas** (`_fit_title(..., max_lines=2)`) — os
+  templates de título de capa (`_TITLE_TEMPLATES` em content.py) foram
+  encurtados de propósito pra caberem nesse limite mesmo em fonte pequena.
+- **Cada slide tem SUA PRÓPRIA foto**, buscada no Pexels pela palavra-chave
+  daquele slide específico (`SlideSpec.image_query`, ver `content.py`) — regra
+  do usuário: "a palavra-chave principal de algum escrito em um slide precisa
+  trazer uma imagem que corresponda aquilo", pra nunca repetir imagem dentro
+  do carrossel nem entre posts. Exceção: o 1º slide de um post de ALERTA REAL
+  (`image_query=None`) continua usando a foto "oficial" do aeroporto (curada/
+  satélite/ilustração, ver backgrounds.get_background_for_post) — é a mais
+  confiável/específica que existe; só os demais slides (e TODOS os slides de
+  post educativo, que não têm aeroporto específico) usam Pexels.
+- **Slide de Call-to-Action obrigatório, sempre por último**
+  (`slide.render_cta_slide`), em TODO carrossel — real ou educativo. Nunca faz
+  parte da lista `PostContent.slides` que quem monta o conteúdo escreve;
+  `render_post_slides` acrescenta esse slide sozinho no final, sempre.
+- **Posts de alerta real**: 2 slides de conteúdo (manchete + "o que isso
+  significa") + 1 opcional quando há data de término real (só NOTAM, nunca
+  METAR — ver `duracao_slide` em `content._build_one_post`) + CTA = 3 ou 4
+  slides no total.
+- **Posts educativos (fallback)**: 6-7 slides de conteúdo (a escolha entre 6
+  e 7 é de quem escreve o `Topic` em `fallback_content.py`, não uma regra
+  fixa) + CTA = 7 ou 8 no total. Ver seção "Fallback educativo" mais abaixo.
+- `PEXELS_API_KEY` — chave gratuita (pexels.com/api, sem exigir crédito do
+  fotógrafo), configurada como secret do GitHub e no `.env` local. Sem ela,
+  `backgrounds.fetch_pexels_photo` devolve `None` e quem chamou cai pro fundo
+  "oficial" do post — nunca quebra a geração do slide, só perde a variedade.
+
+## Só avisos "quentes" viram post (regra atualizada 2026-08-27)
+
+O usuário revisou o feed e achou muitos avisos "mornos" (restrição real mas
+geralmente contornável — visibilidade/teto marginal, vento forte mas não
+severo, auxílio de navegação fora do ar) — pediu pra só postar risco real de
+atraso/cancelamento/desvio. `rules.HIGH_SEVERITY_KINDS` (antes vivia como
+`content._HIGH_SEVERITY_KINDS`, só definia a COR do post) agora também
+filtra, na origem (`rules.evaluate_airport`), quais `Reason`/`NotamHit`
+sequer chegam a existir na `AirportEvaluation` — motivo fora desse conjunto
+nunca gera post sozinho, mesmo que apareça junto de um motivo quente na
+mesma leitura de METAR (nesse caso, só o motivo quente conta pro post; o
+morno fica de fora das reasons desde a origem). Na prática, `severity` de
+todo post real agora é sempre `"alto"` — `"atenção"` ficou só como valor
+teoricamente possível, não mais alcançável com as regras atuais.
+
+## Referência de estilo: feed do G1 no Instagram (parcialmente superada acima)
 
 O padrão escolhido (aprovado pelo usuário em 2026-08-23) é inspirado no card
-de notícia do G1 no Instagram:
+de notícia do G1 no Instagram — a foto real de fundo, o degradê escuro na
+base, a etiqueta colorida (kicker) e o título em frase normal (não CAIXA
+ALTA) continuam valendo, exatamente como descritos abaixo, e agora se aplicam
+a TODO slide, não só à capa (ver seção acima):
 
 - **Foto real de fundo**, ocupando o slide inteiro (não ilustração/ícone,
   quando há alternativa real disponível) — é o que dá credibilidade: "as
@@ -16,26 +78,18 @@ de notícia do G1 no Instagram:
   dia" (aeroporto da própria cidade, não um desenho genérico).
 - **Degradê escuro na base** da foto (não mais um bloco preto sólido) —
   garante legibilidade do título sem esconder a foto.
-- **Selo pequeno da conta** (`@avisoaereo`) discreto, canto superior esquerdo.
-- **Etiqueta colorida curta (kicker)** acima do título — hoje mostra
-  `ICAO · UF` (informação nova, já que o título repete cidade/categoria). A
-  cor da etiqueta segue a severidade (vermelho = alto impacto, âmbar =
-  atenção).
+- **Etiqueta colorida curta (kicker)** acima do título — no 1º slide de um
+  alerta real mostra `ICAO · UF`; nos demais, uma categoria curta própria do
+  slide (ex.: "O QUE ISSO SIGNIFICA", "PREVISÃO"). A cor da etiqueta segue a
+  severidade (vermelho = alto impacto; azul = conteúdo educativo).
 - **Título em frase normal** (só a primeira letra maiúscula), não em CAIXA
-  ALTA — bold, branco, 2-3 linhas.
-- Quando a foto de fundo exige crédito (licença CC-BY/CC-BY-SA), uma linha
-  pequena "Foto: {autor}" aparece no rodapé do slide.
+  ALTA — bold, branco, no máximo 2 linhas (ver seção acima).
+- Quando a foto de fundo exige/permite crédito, uma linha pequena
+  "Foto: {autor}" aparece no rodapé do slide.
 
-O slide EXPLICATIVO (fundo branco, texto corrido serifado) não segue esse
-padrão fotográfico; ele é o card de "aprofundamento".
-
-**Regra fixa (2026-08-23): todo post é carrossel, sempre com no mínimo 2
-slides** — capa (mensagem principal + palavras-chave) e explicativo (o que
-aconteceu / o que significa / duração). `needs_explicativo` em
-`build_post_content` (content.py) é sempre `True` — não voltar a deixar
-condicional. Se algum dia fizer sentido um carrossel com mais de 2 slides
-(ex.: capas adicionais pra informação que não cabe em uma), pode crescer,
-nunca encolher pra 1 slide.
+**Regra fixa (2026-08-23, contagem de slides atualizada em 2026-08-27): todo
+post é carrossel, sempre com no mínimo 2 slides de conteúdo + o CTA final**
+— ver contagem exata por tipo de post na seção acima.
 
 ## Regra fixa: sempre explicar o impacto prático (aprovado 2026-08-23)
 
@@ -81,17 +135,22 @@ como pousar numa **pista ou aeroporto diferente** do planejado. Ao adicionar
 um `headline_kind` novo, manter essa linha — "o seu voo pode..." em vez de
 "há chance de...".
 
-### Slide explicativo: contextualização + fonte DECEA (aplicado 2026-08-24)
+### Slide explicativo: contextualização + fonte DECEA (aplicado 2026-08-24; SUPERADO 2026-08-27)
 
-O slide EXPLICATIVO agora abre com um parágrafo de contexto
-(`ExplicativoContent.contexto`, renderizado em `slide.py` logo após a linha
-divisória, antes de "O QUE ACONTECEU") que situa a notícia e deixa claro que
-a conta traz dados das fontes oficiais do DECEA (REDEMET/AISWEB) — pedido do
-usuário depois de ver o carrossel ir direto pros blocos técnicos sem
-contextualizar nada antes. `content.py` gera esse texto automaticamente por
-post (menciona a cidade/ICAO); `fallback_content.py` usa uma versão fixa
-adaptada ao tom educativo. Campo opcional (`None` = nenhum parágrafo extra),
-mas hoje é sempre preenchido nos dois lugares que constroem `PostContent`.
+**Superado pelo redesign do carrossel (ver seção no topo do arquivo)** — o
+slide EXPLICATIVO e a classe `ExplicativoContent` não existem mais, então o
+parágrafo de contexto descrito abaixo também não existe mais como slide.
+A menção à fonte oficial (DECEA/REDEMET/AISWEB) permanece na legenda dos
+posts de alerta real (`content._build_one_post`), mas ficou de fora da
+legenda do educativo na reescrita de `fallback_content.py` — vale considerar
+adicionar de volta ali se fizer falta pra credibilidade da conta.
+
+~~O slide EXPLICATIVO agora abre com um parágrafo de contexto~~
+~~(`ExplicativoContent.contexto`, renderizado em `slide.py` logo após a linha~~
+~~divisória, antes de "O QUE ACONTECEU") que situa a notícia e deixa claro que~~
+~~a conta traz dados das fontes oficiais do DECEA (REDEMET/AISWEB) — pedido do~~
+~~usuário depois de ver o carrossel ir direto pros blocos técnicos sem~~
+~~contextualizar nada antes.~~
 
 ### Fontes empacotadas no repo, não do sistema (correção de bug, 2026-08-24)
 
@@ -284,36 +343,29 @@ educativo tem ritmo **próprio e garantido**, independente de haver posts reais
 na mesma execução ou não — não é mais "só quando não há nada real pra
 postar".
 
-- **Obrigatório a cada `MIN_FALLBACK_INTERVAL_SECONDS` (4h)**, contado desde o
-  último post EDUCATIVO especificamente (`_meta.last_fallback_at` em
-  `state/posted.json`, separado de `_meta.last_post_at` que segue existindo
-  mas agora só serve de registro geral) — posts reais publicados no meio não
-  atrasam esse relógio. `run_cycle.run()` chama `maybe_build_fallback` sempre
-  (não só quando `candidates` está vazio) e, se for hora, insere o educativo
-  na FRENTE da lista de candidatos daquela execução (garante que ele entra
-  dentro do `MAX_POSTS_PER_RUN`, mesmo em dia cheio de avisos reais). O
-  intervalo de 4h em si não mudou — continua bem mais espaçado que "1 por
-  hora" pra não competir com a cota de ~25 posts/24h da API do Instagram nem
-  criar um padrão repetitivo que sistemas antispam da Meta possam sinalizar
-  (decidido 2026-08-23).
-- **Carrossel de 3 slides, não mais 2** (regra nova, 2026-08-24, pedido
-  explícito do usuário: "precisam trazer um carrossel com três slides, sendo
-  o primeiro para capa... e dois explicativos"): capa (igual sempre foi) +
-  UM slide explicativo por bloco de conteúdo (`Topic.heading_1`/`body_1` no
-  slide 2, `Topic.heading_2`/`body_2` no slide 3 — antes os dois cabiam
-  juntos num único slide explicativo). Implementado via
-  `PostContent.explicativo_slides` (content.py) — uma lista de
-  `ExplicativoContent`, cada um com só 1 bloco de texto (`o_que_significa=""`
-  pra pular o 2º bloco, ver `render_explicativo_slide` em slide.py); quando
-  presente, `slide.render_post_slides` ignora o campo singular `explicativo`
-  e gera 1 imagem por item da lista. Os posts de aviso real (content.py,
-  `_build_one_post`) **não usam esse campo** — continuam com capa + 1 slide
-  explicativo de 2 blocos, como sempre (regra de carrossel mínimo de 2 slides
-  do topo deste arquivo não mudou pra eles). Quando o slide explicativo tem só
-  1 bloco, `slide.py` aumenta a fonte e centraliza o texto verticalmente
-  (`single_block` em `render_explicativo_slide`) pra não sobrar espaço em
-  branco — não mexer nisso pros posts de 2 blocos (real), que continuam
-  ancorados no topo como sempre.
+- **Obrigatório sempre que passar `MIN_FALLBACK_INTERVAL_SECONDS` (6h) sem
+  post REAL** (regra atualizada 2026-08-27 — antes eram 4h fixas contadas
+  desde o último EDUCATIVO, disparando sempre nessa cadência mesmo em dia
+  cheio de avisos reais; agora é contado desde o último post real,
+  `_meta.last_real_post_at` em `state/posted.json` — um dia cheio de avisos
+  reais não força educativo nenhum, mas uma seca de notícia real mantém a
+  conta ativa). `run_cycle.run()` chama `maybe_build_fallback` sempre (não só
+  quando `candidates` está vazio) e, se for hora, insere o educativo na
+  FRENTE da lista de candidatos daquela execução (garante que ele entra
+  dentro do `MAX_POSTS_PER_RUN`).
+- **Carrossel de 6-7 slides de conteúdo + CTA** (regra atualizada 2026-08-27
+  — supera a versão de 3 slides de 2026-08-24, ver histórico abaixo): cada
+  `Topic` (fallback_content.py) traz uma lista `slides: list[EduSlide]` com 6
+  ou 7 itens (a escolha entre 6 e 7 é de quem escreve o tópico) — cada
+  `EduSlide` já é, sozinho, um slide completo no molde único do carrossel
+  (kicker + título curto + palavra-chave própria de imagem, ver seção
+  "Redesign completo do carrossel" no topo deste arquivo). `slide.py` não
+  tem mais um caso especial pra fallback — o mesmo `render_post_slides` que
+  atende post real atende o educativo, só que com uma lista mais longa de
+  slides.
+  ~~Carrossel de 3 slides, não mais 2 (regra 2026-08-24, capa + 1 slide~~
+  ~~explicativo por bloco de conteúdo, via `PostContent.explicativo_slides`~~
+  ~~e `ExplicativoContent`) — campo e classe não existem mais.~~
 - **Conteúdo**: rotação fixa de tópicos (`fallback_content.TOPICS`) nas 6
   categorias pedidas pelo usuário — regras/leis/regulamentos da aviação
   (geral e comercial), significado de códigos de aeroporto (IATA/ICAO,
@@ -331,8 +383,10 @@ postar".
 
 ### Segredos necessários no GitHub (Settings → Secrets and variables → Actions)
 
-`INSTAGRAM_TOKEN`, `REDEMET_API_KEY`, `AISWEB_API_KEY`, `AISWEB_API_PASS` —
-os mesmos valores do `.env` local. `gh` CLI foi instalado nesta máquina em
+`INSTAGRAM_TOKEN`, `REDEMET_API_KEY`, `AISWEB_API_KEY`, `AISWEB_API_PASS`,
+`PEXELS_API_KEY` (adicionado 2026-08-27 — busca de foto por palavra-chave em
+cada slide, ver backgrounds.fetch_pexels_photo) — os mesmos valores do `.env`
+local. `gh` CLI foi instalado nesta máquina em
 2026-08-24 (`winget install --id GitHub.cli`, autenticado como
 PabloEduardo89) — dá pra usar `gh secret set NOME --repo
 PabloEduardo89/aviso-aereo` direto do terminal a partir de agora, sem precisar

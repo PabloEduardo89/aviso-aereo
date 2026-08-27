@@ -218,6 +218,46 @@ def get_generic_photo(headline_kind: str | None) -> tuple | None:
     return img, _manifest_credit(GENERIC_PHOTOS_MANIFEST, f"{category}/{filename}")
 
 
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
+PEXELS_SEARCH_URL = "https://api.pexels.com/v1/search"
+
+
+def fetch_pexels_photo(query: str, exclude_ids: set | None = None) -> tuple | None:
+    """Busca uma foto real no Pexels que combine com a palavra-chave específica de UM
+    slide — regra do usuário (2026-08-27): cada slide de um carrossel de vários slides
+    usa a foto da SUA PRÓPRIA palavra-chave (o radical/dupla de palavras mais central
+    daquele slide), não a mesma foto do post inteiro — garante coerência slide a slide
+    e evita repetir imagem entre slides/posts. `exclude_ids` (ids de foto já usados
+    nesse mesmo carrossel) evita pegar a mesma foto de novo se a busca trouxer
+    resultados repetidos. Devolve (imagem já cortada pro slide, crédito do fotógrafo,
+    id da foto) ou None se a busca falhar ou não houver PEXELS_API_KEY configurada —
+    quem chama trata o fallback."""
+    if not PEXELS_API_KEY:
+        return None
+    try:
+        resp = requests.get(
+            PEXELS_SEARCH_URL,
+            headers={"Authorization": PEXELS_API_KEY},
+            params={"query": query, "per_page": 10, "orientation": "portrait"},
+            timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        photos = resp.json().get("photos") or []
+    except requests.RequestException:
+        return None
+    if not photos:
+        return None
+    pool = [p for p in photos if not exclude_ids or p["id"] not in exclude_ids] or photos
+    photo = random.choice(pool[:6])
+    try:
+        img_resp = requests.get(photo["src"]["portrait"], timeout=REQUEST_TIMEOUT)
+        img_resp.raise_for_status()
+    except requests.RequestException:
+        return None
+    img = Image.open(BytesIO(img_resp.content)).convert("RGB")
+    return cover_resize(img), photo["photographer"], photo["id"]
+
+
 def get_background_for_post(icao: str, category: str, headline_kind: str | None = None) -> tuple:
     """Ponto de entrada usado pelo slide.py: devolve (imagem, crédito_ou_None).
     Prioridade: foto curada do aeroporto -> foto genérica pertinente à

@@ -11,11 +11,15 @@ Diferente de publish.py (--stage / --go), aqui não há revisão humana no meio
 — é o modo "publicações automáticas" pedido pelo usuário em 2026-08-23, com a
 deduplicação (state.py) fazendo o papel de não postar a mesma coisa 2x.
 
-O fallback educativo (fallback_content.py) é OBRIGATÓRIO a cada
-MIN_FALLBACK_INTERVAL_SECONDS (4h), independente de haver posts reais nesta
-execução ou não (regra atualizada em 2026-08-24 — antes só entrava quando não
-havia nenhum candidato real; o usuário pediu ritmo próprio e garantido pro
-conteúdo de curiosidade, não mais "só quando a conta ficaria muda").
+O fallback educativo (fallback_content.py) é OBRIGATÓRIO sempre que passar
+MIN_FALLBACK_INTERVAL_SECONDS (6h) sem nenhum post INFORMATIVO REAL ter saído
+— regra atualizada em 2026-08-27 (pedido do usuário: "caso não tenha nenhum
+informativo real do METAR, dentro de um período de 6 horas, continue com os
+posts educativos"). Diferente da versão anterior (relógio fixo de 4h desde o
+último educativo, sempre disparando de hora em hora independente de haver
+notícia real ou não), agora o relógio só é resetado por um post REAL — se a
+seca de notícias reais continuar, o educativo pode voltar a sair na execução
+seguinte, passando pro próximo tópico da rotação a cada vez.
 """
 import sys
 import time
@@ -42,16 +46,12 @@ MAX_POSTS_PER_RUN = 3
 # outro) aeroporto, os posts não saem juntos/ao mesmo tempo. Aprovado 2026-08-23.
 MIN_INTERVAL_SECONDS = 360  # 6 minutos
 
-# intervalo entre posts educativos de fallback — obrigatório, não condicional:
-# a cada MIN_FALLBACK_INTERVAL_SECONDS sai um post de curiosidade, HAJA OU NÃO
-# aviso real na mesma execução (regra atualizada 2026-08-24 — o relógio
-# (`_meta.last_fallback_at`) só é resetado por um post de fallback, nunca por
-# um post real; antes um dia cheio de avisos reais podia empurrar a
-# curiosidade por muito mais que 4h). 4h em vez de 1/hora de propósito, pra
-# não competir pela cota diária da API do Instagram (~25 posts/24h) nem criar
-# um padrão repetitivo (mesmo tipo de conteúdo, mesmo horário, todo dia) que
-# sistemas antispam da Meta possam sinalizar. Aprovado 2026-08-23.
-MIN_FALLBACK_INTERVAL_SECONDS = 4 * 3600  # 4 horas
+# tempo máximo sem NENHUM post real antes do educativo virar obrigatório —
+# regra atualizada 2026-08-27 (ver docstring do módulo). O relógio
+# (`_meta.last_real_post_at`) só é resetado por um post real (nunca por um
+# educativo) — 6h é mais folgado que os antigos 4h fixos, mas agora reage à
+# seca de notícias de verdade em vez de disparar sempre na mesma cadência.
+MIN_FALLBACK_INTERVAL_SECONDS = 6 * 3600  # 6 horas
 
 
 def collect_candidates(state: dict) -> list:
@@ -81,12 +81,15 @@ def collect_candidates(state: dict) -> list:
 
 def maybe_build_fallback(state: dict, now: datetime) -> object | None:
     """Devolve 1 PostContent educativo (ver fallback_content.py) se já faz tempo
-    demais (MIN_FALLBACK_INTERVAL_SECONDS) desde o ÚLTIMO POST EDUCATIVO — não
-    desde o último post em geral, então posts reais publicados nesta ou em
-    execuções anteriores não atrasam esse relógio (regra atualizada 2026-08-24:
-    o post educativo agora é obrigatório a cada 4h, sempre). Devolve None se
-    ainda não é hora (ou se essa é a 1ª vez, sem registro de tempo)."""
-    last_iso = get_meta(state, "last_fallback_at")
+    demais (MIN_FALLBACK_INTERVAL_SECONDS, 6h) desde o ÚLTIMO POST REAL — regra
+    atualizada 2026-08-27: antes o relógio era contado desde o último EDUCATIVO
+    (disparava sempre, de 4 em 4h, mesmo em dia cheio de notícia real); agora só
+    é contado desde o último post real (`_meta.last_real_post_at`), então um dia
+    cheio de avisos reais não força educativo nenhum, mas uma seca de notícias
+    reais mantém a conta ativa com curiosidades. Devolve None se ainda não é
+    hora — ou se nunca houve nenhum post real, considera que já é hora (evita
+    nunca ligar o fallback num lançamento sem histórico)."""
+    last_iso = get_meta(state, "last_real_post_at")
     if last_iso is not None:
         elapsed = (now - datetime.fromisoformat(last_iso)).total_seconds()
         if elapsed < MIN_FALLBACK_INTERVAL_SECONDS:
@@ -102,11 +105,11 @@ def run():
     now = datetime.now(timezone.utc)
     candidates = collect_candidates(state)
 
-    # post educativo é obrigatório a cada MIN_FALLBACK_INTERVAL_SECONDS (4h),
-    # independente de haver candidato real nesta execução — vai sempre na
-    # frente da lista pra garantir que entra dentro do MAX_POSTS_PER_RUN, e o
+    # post educativo é obrigatório quando passou MIN_FALLBACK_INTERVAL_SECONDS
+    # (6h) sem post real (ver maybe_build_fallback) — quando entra, vai sempre
+    # na frente da lista pra garantir que cabe dentro do MAX_POSTS_PER_RUN; o
     # resto dos candidatos reais (se sobrar espaço) sai junto ou fica pra
-    # próxima execução, como já acontecia antes (regra atualizada 2026-08-24).
+    # próxima execução.
     fallback = maybe_build_fallback(state, now)
     if fallback is not None:
         print(f"Post educativo obrigatório (a cada {MIN_FALLBACK_INTERVAL_SECONDS // 3600}h) "
@@ -143,8 +146,8 @@ def run():
         posted_at = datetime.now(timezone.utc).isoformat()
         mark_posted(state, post.dedup_key, media_id, posted_at)
         set_meta(state, "last_post_at", posted_at)
-        if post.icao == "_FALLBACK":
-            set_meta(state, "last_fallback_at", posted_at)  # zera o relógio do post educativo obrigatório
+        if post.icao != "_FALLBACK":
+            set_meta(state, "last_real_post_at", posted_at)  # zera o relógio do educativo obrigatório (6h)
         save_state(state)  # salva a cada post — se o job cair no meio, o que já saiu fica registrado
         posted_count += 1
         print(f"[{post.icao}] publicado: media_id={media_id}")
