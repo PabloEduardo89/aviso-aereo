@@ -248,9 +248,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 13,
-    "last_fallback_at": "2026-08-27T01:48:24.522074+00:00",
-    "last_post_at": "2026-08-27T04:30:40.195005+00:00",
+    "fallback_topic_index": 14,
+    "last_fallback_at": "2026-08-27T16:16:06.157130+00:00",
+    "last_post_at": "2026-08-27T16:16:06.157130+00:00",
     "last_real_post_at": "2026-08-27T04:30:40.195005+00:00"
   },
   "fallback|bagagem|2026-08-25": {
@@ -296,5 +296,9 @@
   "fallback|rastreamento_voos|2026-08-26": {
     "media_id": "17888490663674357",
     "posted_at": "2026-08-26T05:37:39.762710+00:00"
+  },
+  "fallback|recordes_jato_executivo|2026-08-27": {
+    "media_id": "18486411280105672",
+    "posted_at": "2026-08-27T16:16:06.157130+00:00"
   }
 }
