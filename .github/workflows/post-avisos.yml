@@ -39,7 +39,4 @@ jobs:
         run: python run_cycle.py
 
       - name: Comitar estado atualizado (posted.json)
-        run: |
-          git add automation/state/posted.json
-          git diff --cached --quiet || git commit -m "state: atualiza registro de posts [skip ci]"
-          git push
+        run: python automation/commit_state.py

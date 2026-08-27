@@ -5,6 +5,35 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## Commit+push resiliente a push concorrente (corrigido 2026-08-27)
+
+**Causa raiz do incidente de 2026-08-26** (execução 33021086018 falhou): o
+workflow faz `git push` em dois lugares — `publish.py.host_images_on_github`
+(hospeda a imagem do post) e o passo final do YAML (comita
+`state/posted.json`) — e nenhum dos dois tentava se atualizar antes de
+empurrar. Um push concorrente em `main`, de QUALQUER origem (no caso, edições
+no `index.html` feitas em paralelo), derrubou os dois: abortou 1 post no
+meio do ciclo e, pior, impediu o `state.json` de ser salvo, criando risco de
+post duplicado na execução seguinte (dedup baseado num arquivo desatualizado).
+
+**Correção**: `git_utils.commit_and_push` (novo) — `add` + `commit` + `push`
+com retry: se rejeitado por non-fast-forward, faz `fetch` + `rebase
+origin/<branch>` e tenta de novo (até 5x). Como a automação só mexe em
+`posts/` e `automation/state/` — nunca em `index.html` ou qualquer outro
+arquivo do app — um rebase sobre o que avançou no branch nunca deveria ter
+conflito de verdade; se acontecer mesmo assim, aborta o rebase e levanta erro
+claro em vez de deixar o checkout do runner quebrado. Usado por:
+- `publish.host_images_on_github` (era 3 `subprocess.run` cru, agora chama
+  `commit_and_push`).
+- `commit_state.py` (script novo, chamado pelo passo final do YAML no lugar
+  do `git push` cru que existia direto no `post-avisos.yml`).
+
+Testado simulando o cenário exato do incidente (2 clones de um repo git
+local, um empurra "por baixo" enquanto o outro está desatualizado) — o
+primeiro push é rejeitado, o retry recupera sozinho, histórico final linear
+sem conflito. Não repetir o padrão de `git push` cru em nenhum lugar novo do
+pipeline — sempre passar por `git_utils.commit_and_push`.
+
 ## Palavra-chave de imagem: sempre em INGLÊS, nunca português (lição 2026-08-27)
 
 Testado empiricamente: o Pexels responde muito melhor a `image_query` em

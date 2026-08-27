@@ -20,7 +20,6 @@ Nunca chama --go sozinho: cada publicação real exige rodar os dois passos
 em momentos separados, com a legenda/imagens já revisadas no meio.
 """
 import os
-import subprocess
 import sys
 
 import requests
@@ -29,6 +28,7 @@ from dotenv import load_dotenv
 from airports import AIRPORTS
 from content import build_post_content
 from fetch_data import FetchError, fetch_metar, fetch_notam
+from git_utils import commit_and_push
 from rules import evaluate_airport
 from slide import render_post_slides
 
@@ -72,9 +72,10 @@ def get_publishing_credentials():
 
 
 def host_images_on_github(paths: list, icao: str) -> list:
-    """Copia as imagens pra <repo>/posts/<icao>/, comita e dá push — devolve
-    as URLs raw.githubusercontent.com correspondentes. Requer confirmação do
-    usuário no momento do git push (é uma escrita visível no repo público)."""
+    """Copia as imagens pra <repo>/posts/<icao>/, comita e dá push (com retry
+    resiliente a push concorrente — ver git_utils.commit_and_push e o
+    incidente de 2026-08-26 que motivou isso) — devolve as URLs
+    raw.githubusercontent.com correspondentes."""
     dest_dir = os.path.join(REPO_ROOT, POSTS_DIR_NAME, icao)
     os.makedirs(dest_dir, exist_ok=True)
 
@@ -86,12 +87,7 @@ def host_images_on_github(paths: list, icao: str) -> list:
             dst.write(src.read())
         rel_paths.append(f"{POSTS_DIR_NAME}/{icao}/{filename}")
 
-    subprocess.run(["git", "-C", REPO_ROOT, "add", *rel_paths], check=True)
-    status = subprocess.run(["git", "-C", REPO_ROOT, "status", "--porcelain", *rel_paths],
-                             capture_output=True, text=True, check=True)
-    if status.stdout.strip():
-        subprocess.run(["git", "-C", REPO_ROOT, "commit", "-m", f"post: imagens {icao}"], check=True)
-        subprocess.run(["git", "-C", REPO_ROOT, "push", "origin", GITHUB_BRANCH], check=True)
+    commit_and_push(REPO_ROOT, rel_paths, f"post: imagens {icao}", branch=GITHUB_BRANCH)
 
     return [f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{rel}" for rel in rel_paths]
 
