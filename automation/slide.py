@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
+import news_images
 import style
 from backgrounds import duotone, fetch_pexels_photo, get_background_for_post
 from content import PostContent, SlideSpec
@@ -269,14 +270,23 @@ def render_cta_slide(accent, out_path=None) -> str:
 
 
 def _resolve_slide_background(post: PostContent, slide: SlideSpec, used_photo_ids: set):
-    """slide.image_query is None -> usa o fundo "oficial" do post (foto curada do
-    aeroporto / satélite / ilustração, ver backgrounds.get_background_for_post) —
-    reservado pro 1º slide, o mais específico/confiável que temos. Qualquer
-    image_query preenchido busca uma foto real no Pexels pela palavra-chave
-    daquele slide especificamente (regra do usuário, 2026-08-27: cada slide usa
-    a foto da SUA própria palavra-chave, nunca repete a mesma foto dentro do
-    carrossel)."""
+    """slide.image_query is None -> capa (1º slide) — tenta primeiro uma foto
+    REAL da notícia (ver style.wants_real_news_photo/news_images), quando o
+    evento parece genuinamente noticioso; senão usa o fundo "oficial" do
+    post (foto curada do aeroporto / satélite / ilustração, ver
+    backgrounds.get_background_for_post), como já era — pedido do usuário,
+    2026-08-28. Qualquer image_query preenchido busca uma foto real no
+    Pexels pela palavra-chave daquele slide especificamente (regra do
+    usuário, 2026-08-27: cada slide usa a foto da SUA própria palavra-chave,
+    nunca repete a mesma foto dentro do carrossel)."""
     if slide.image_query is None:
+        if style.wants_real_news_photo(post):
+            required, any_of = style.build_news_search(post)
+            when_dt = post.when_dt or datetime.now(timezone.utc)
+            news = news_images.search_news_photo(required, any_of, when_dt)
+            if news is not None:
+                img, credit, _source_url = news
+                return img, credit
         img, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
         return img, credit
 
@@ -458,12 +468,20 @@ def render_post_slides_variation(post: PostContent, mold: str, fmt_state: dict) 
     badge = style.category_badge(post.headline_kind)
     when_dt = post.when_dt or datetime.now(timezone.utc)
 
-    query = style.pick_image_query(post.headline_kind, fmt_state)
-    result = fetch_pexels_photo(query)
-    if result is not None:
-        bg, credit, _ = result
-    else:
-        bg, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
+    bg = credit = None
+    if style.wants_real_news_photo(post):
+        required, any_of = style.build_news_search(post)
+        news = news_images.search_news_photo(required, any_of, when_dt)
+        if news is not None:
+            bg, credit, _source_url = news
+
+    if bg is None:
+        query = style.pick_image_query(post.headline_kind, fmt_state)
+        result = fetch_pexels_photo(query)
+        if result is not None:
+            bg, credit, _ = result
+        else:
+            bg, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
 
     fmt = style.next_title_format(fmt_state)
     title = style.title_format_variation(fmt, post.city, post.headline_kind, when_dt)

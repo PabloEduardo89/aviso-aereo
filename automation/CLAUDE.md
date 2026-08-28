@@ -5,6 +5,57 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## Foto REAL da notícia, automática, quando o evento é noticioso (2026-08-28, 3ª passada)
+
+Pedido do usuário: "sempre imagens reais da notícia trazida, sempre que isso
+for aplicável... caso não haja, use pexels/fontes que já estão sendo usadas
+hoje". Implementado em `news_images.py` (busca) + `style.wants_real_news_photo`/
+`style.build_news_search` (decide QUANDO e O QUÊ buscar) — entra em jogo pro
+1º slide (capa) de QUALQUER molde (moderno, clássico, manchete), sempre como
+a PRIMEIRA prioridade, acima até da foto curada do aeroporto.
+
+- **"Aplicável"** = mesmo critério de relevância já usado pra travar o molde
+  em "moderno" (`severity_tier == "alta"`) OU sinal concreto de incidente no
+  texto do NOTAM (aeronave identificada ou resposta de emergência —
+  `style.EventContext`, duração sozinha não conta). Fora disso (a maioria
+  dos posts — clima rotineiro, NOTAM comum), nem tenta a busca: cai direto
+  no Pexels/foto curada, sem custo de rede extra.
+- **Por que NÃO usa Google News / Bing News RSS (a escolha óbvia/mais
+  simples)**: testado e descartado — os dois têm, no PRÓPRIO feed, uma
+  cláusula de copyright que proíbe explicitamente uso fora de "um leitor de
+  RSS pessoal, não comercial" ("qualquer outro uso exige permissão por
+  escrito" — Google e Microsoft, respectivamente). Como @avisoaereo é uma
+  conta comercial, usar esses agregadores violaria os termos do PRÓPRIO
+  FEED. Em vez disso, lê `news_images.NEWS_FEEDS` — feeds RSS OFICIAIS de
+  veículos brasileiros (G1, CNN Brasil), publicados pelos próprios veículos
+  pra sindicação de manchetes, sem essa restrição.
+  **Continua existindo o risco de direito autoral sobre a FOTO em si**
+  (pertence ao veículo de imprensa) — o mesmo risco já discutido e aceito
+  explicitamente pelo usuário pro carrossel manual do incidente de SBRJ
+  (2026-08-27) e reconfirmado pra rodar automático/sem pausa (2026-08-28).
+  Isso aqui só evita o problema ADICIONAL de violar o termo do agregador.
+- **Casamento**: extrai o(s) apelido(s) do aeroporto de `airport["city"]`
+  (ex.: "Santos Dumont (Rio de Janeiro)" vira 2 anchors aceitos
+  separadamente — apelido do aeroporto RARAMENTE aparece junto do nome da
+  cidade na mesma manchete) + basta 1 termo genérico de aviação junto
+  (`_NEWS_ANY_OF_TERMS`) + item publicado dentro de 18h do momento do
+  evento (`max_age_hours`). Extrai a foto de capa do artigo via meta
+  `og:image` (regex simples, sem dependência nova) e rejeita imagem menor
+  que 400×300 (filtra ícone/logo pequeno).
+  **Lição do 1º teste**: a versão inicial exigia a string INTEIRA de
+  `post.city` (com apelido+cidade+parênteses) presente literalmente —
+  nunca batia com manchete real nenhuma. Corrigido pra aceitar QUALQUER UM
+  dos dois nomes.
+- Testado de ponta a ponta com o NOTAM real do incidente de SBRJ
+  (`12785394`, ainda ativo): achou e usou automaticamente uma foto real
+  (passageiros na fila do Santos Dumont, CNN Brasil) através do pipeline de
+  produção completo (`build_post_content` → `render_post_slides`), sem
+  nenhuma intervenção manual.
+- Sem resultado (feed fora do ar, nada recente com as palavras-chave, ou
+  sem `og:image` extraível) → `None`, cai pro pipeline de sempre
+  (`backgrounds.get_background_for_post` / `fetch_pexels_photo`) — nunca
+  quebra a geração do post.
+
 ## Regras de quando cada molde entra: moderno é o carro-chefe (2026-08-28, 2ª passada)
 
 **Revisão da seção abaixo, no mesmo dia**, depois do carrossel manual do

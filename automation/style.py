@@ -197,6 +197,39 @@ def wants_explicativo_slide(ctx: EventContext, threshold: int = 2) -> bool:
     return ctx.richness() >= threshold
 
 
+# --- foto real da notícia, condicional a o evento parecer noticioso -------
+# pedido do usuário, 2026-08-28: "sempre imagens reais da notícia trazida,
+# sempre que isso for aplicável". "Aplicável" aqui é o mesmo critério de
+# "relevância alta" já usado pra travar o molde no "moderno" (severity_tier)
+# OU um sinal concreto de incidente no texto do NOTAM (aeronave identificada
+# ou resposta de emergência — duração sozinha não conta: é rotina comum de
+# NOTAM, não indício de incidente real com fotos disponíveis).
+_NEWS_ANY_OF_TERMS = ["aeroporto", "aviacao", "avião", "aviao", "voo", "voos", "pista"]
+
+
+def wants_real_news_photo(post: PostContent) -> bool:
+    if severity_tier(post.headline_kind) == "alta":
+        return True
+    ctx = extract_event_context(post)
+    return bool(ctx.aircraft_id or ctx.response_action or ctx.casualties_info)
+
+
+def build_news_search(post: PostContent) -> tuple:
+    """(anchor_terms, topic_terms) pra news_images.search_news_photo.
+    `post.city` costuma vir como "Apelido (Cidade)" (ex.: "Santos Dumont
+    (Rio de Janeiro)", ver airports.py) — o apelido do aeroporto e o nome da
+    cidade raramente aparecem JUNTOS, literalmente, na mesma manchete de
+    notícia, então cada um vira um anchor aceito separadamente (basta UM
+    bater)."""
+    city = post.city
+    if "(" in city and city.endswith(")"):
+        primary, _, rest = city.partition("(")
+        anchors = [primary.strip(), rest[:-1].strip()]
+    else:
+        anchors = [city]
+    return anchors, _NEWS_ANY_OF_TERMS
+
+
 # --- horário noturno (composição mais escura) ------------------------------
 def is_nighttime(when_dt: datetime) -> bool:
     local = when_dt + BRT_OFFSET
