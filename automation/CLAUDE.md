@@ -217,7 +217,34 @@ fallback, que continua sempre no molde único.
   existem só pra alimentar o molde clássico — o molde único não usa nenhum
   deles.
 
-## Título de capa com QUANDO (dia + data + período do dia) — 2026-08-27
+## Título de capa: hora aproximada + consequência em CAIXA ALTA, escolhidas pelo evento (2026-08-28)
+
+Pedido do usuário: (a) trazer a hora ("por volta das 18h hoje", sobretudo em
+prospecção de futuro) e (b) a consequência em CAIXA ALTA ("pode causar
+ATRASOS e CANCELAMENTOS") — mas **usando julgamento pra aplicar o melhor caso
+pra aquele post naquele momento**, não sempre igual. Implementado como regra
+determinística amarrada aos dados do evento (mesma filosofia do style.py):
+
+- **`_when_phrase(dt_utc, now)`** decide pelo caráter do evento:
+  - início de vigência AINDA no futuro (só NOTAM) → a hora é o dado mais útil:
+    `"a partir das 19h desta noite de sexta-feira"` (ou `"22h45"` quando não é
+    hora cheia). Prospecção — o leitor precisa saber a que horas se preparar.
+  - condição já em curso / leitura ao vivo (METAR agora, NOTAM já ativo) →
+    `"nesta tarde de quinta-feira, 28 de agosto"` (período basta; a hora exata
+    muda a cada boletim e vira ruído). Margem de 20 min pra contar como futuro.
+- **Consequência em CAIXA ALTA** (`{consequencia_caps}` em parte dos templates
+  de `_TITLE_TEMPLATES["alto"]`, valores em `_CONSEQUENCE_CAPS` por
+  `headline_kind`: "ATRASOS e CANCELAMENTOS" pra pista/torre, "ATRASOS e
+  DESVIOS" pra tempestade etc.). `_pick_cover_title` só libera esses templates
+  quando `headline_kind in _LOUD_TITLE_KINDS` (pista/torre fechada, tesoura de
+  vento, trovoada/severo/convectivo — os de maior chance real de
+  cancelamento/desvio). Vento forte, visibilidade/teto, congelante: só
+  templates sóbrios, sem caixa alta gritada — não deixa o feed inteiro
+  parecer manchete sensacionalista (mesma preocupação de "título padrão
+  repetido" de 2026-08-24). Mesmo nos eventos fortes, os templates com caixa
+  alta são ~4 de 11 — aparece com frequência, mas não em todo post.
+
+### Título de capa com QUANDO (dia + data + período do dia) — 2026-08-27
 
 Pedido do usuário, revendo o post que saiu: o título precisa deixar
 explícito quando a interferência ocorre, não só o quê — exemplo dado:

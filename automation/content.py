@@ -33,15 +33,44 @@ def _period_of_day(hour: int) -> str:
     return "noite"
 
 
-def _when_phrase(dt_utc: datetime) -> str:
-    """'nesta tarde de quinta-feira, 27 de agosto', a partir de um datetime em
-    UTC — converte pra horário de Brasília antes de calcular dia/período,
-    porque é a partir daí que o dia muda pro público-alvo do post."""
+def _clock_phrase(local: datetime) -> str:
+    """'19h' / '19h45' — horário de Brasília, sem zero à esquerda na hora."""
+    return f"{local.hour}h{local.minute:02d}" if local.minute else f"{local.hour}h"
+
+
+def _when_phrase(dt_utc: datetime, now: datetime | None = None) -> str:
+    """Frase de QUANDO pro título de capa, escolhida pelo caráter do evento:
+
+    - **evento que ainda vai COMEÇAR** (NOTAM com início de vigência no futuro):
+      a hora é a informação mais útil → 'a partir das 19h desta noite de sexta-feira'
+      (prospecção — o leitor precisa saber a que horas se preparar).
+    - **condição já em curso / leitura ao vivo** (METAR agora, NOTAM já ativo):
+      tom de "isto está acontecendo" → 'nesta tarde de quinta-feira, 28 de agosto'
+      (o período do dia basta; a hora exata muda a cada boletim e não ajuda).
+
+    `dt_utc` e `now` em UTC; converte pra Brasília antes de calcular dia/período,
+    porque é a partir daí que o dia vira pro público-alvo do post."""
     local = dt_utc + BRT_OFFSET
     period = _period_of_day(local.hour)
     weekday = _WEEKDAY_PT[local.weekday()]
+    now = now or datetime.now(timezone.utc)
+    if dt_utc > now + timedelta(minutes=20):   # margem: só conta como "futuro" se de fato mais pra frente
+        # weekday (não período) pra não induzir erro quando o NOTAM começa daqui
+        # a dias; a hora já dá o "quando" fino
+        return f"a partir das {_clock_phrase(local)} de {weekday}"
     month = _MONTH_PT[local.month - 1]
     return f"nesta {period} de {weekday}, {local.day} de {month}"
+
+
+def _when_phrase_short(dt_utc: datetime, now: datetime | None = None) -> str:
+    """Versão curta de `_when_phrase` pros títulos que já carregam a consequência
+    em CAIXA ALTA (longos): só 'nesta tarde' / 'a partir das 22h', sem dia da
+    semana nem data — senão o título estoura as 2 linhas do slide."""
+    local = dt_utc + BRT_OFFSET
+    now = now or datetime.now(timezone.utc)
+    if dt_utc > now + timedelta(minutes=20):
+        return f"a partir das {_clock_phrase(local)}"
+    return f"nesta {_period_of_day(local.hour)}"
 
 # ordem de prioridade pra escolher o destaque principal do slide quando há vários motivos
 _HEADLINE_PRIORITY = [
@@ -181,15 +210,33 @@ _DURATION_IMAGE_QUERY = "clock waiting airport"
 # dia por extenso, sempre presentes (ver _when_phrase), pedido explícito do
 # usuário depois de ver o título sem nenhuma indicação de QUANDO a
 # interferência ocorre.
+# Alguns templates trazem {consequencia_caps} — 1-2 palavras em CAIXA ALTA que
+# nomeiam o impacto prático ("ATRASOS e CANCELAMENTOS") pra fisgar o leitor.
+# Não entra em TODO post: `_pick_cover_title` só libera esses templates pros
+# eventos de maior disrupção (`_LOUD_TITLE_KINDS`) — pista/torre fechada,
+# tesoura de vento, trovoada/severo/convectivo. Alerta real porém menos
+# disruptivo (vento forte, visibilidade/teto, congelante) fica só com os
+# templates sóbrios, sem caixa alta gritada — evita o feed inteiro parecer
+# manchete sensacionalista (a mesma preocupação de "título padrão repetido"
+# que motivou a variação de templates em 2026-08-24).
 _TITLE_TEMPLATES = {
     "alto": [
+        # --- sóbrios (qualquer evento) — usam o {when} completo (dia + data + período) ---
         "{Problema} em {city} {when}",
         "{city}: {problema} {when}",
         "Alerta em {city} {when} — {problema}",
         "{Problema} pode afetar voos em {city} {when}",
-        "Vai voar para {city} {when}? {problema}",
+        "Vai voar para {city} {when}? {Problema}",
         "{city} sob {problema} {when}",
         "Passageiros de {city}: {problema} {when}",
+        # --- consequência em CAIXA ALTA (só pros eventos de maior disrupção) ---
+        # usam {when_short} ('nesta tarde' / 'a partir das 22h') — sem isso o
+        # título estoura 2 linhas mesmo na menor fonte (testado com as cidades
+        # de nome mais longo, ex.: "Santos Dumont (Rio de Janeiro)")
+        "Aeroporto de {city} pode ter {consequencia_caps} {when_short}",
+        "{city}, {when_short}: risco de {consequencia_caps}",
+        "{consequencia_caps} em {city} {when_short}",
+        "{city} pode ter {consequencia_caps} {when_short}",
     ],
     "atenção": [
         "Aeroporto de {city}: {problema} pode atrasar ou alterar voos",
@@ -202,11 +249,42 @@ _TITLE_TEMPLATES = {
     ],
 }
 
+# impacto prático em 1-2 palavras MAIÚSCULAS, por headline_kind — preenche
+# {consequencia_caps} nos templates que têm o slot
+_CONSEQUENCE_CAPS = {
+    "rwy_closed": "ATRASOS e CANCELAMENTOS",
+    "twr_closed": "ATRASOS e CANCELAMENTOS",
+    "windshear": "ATRASOS e ARREMETIDAS",
+    "thunderstorm": "ATRASOS e DESVIOS",
+    "severe_wx": "ATRASOS e DESVIOS",
+    "convective": "ATRASOS e DESVIOS",
+    "freezing": "ATRASOS NO EMBARQUE",
+    "strong_wind": "ATRASOS e ARREMETIDAS",
+    "low_vis": "ATRASOS e DESVIOS",
+    "obscured": "ATRASOS e DESVIOS",
+    "low_ceiling": "ATRASOS e DESVIOS",
+    "navaid_us": "ATRASOS",
+}
+# eventos que justificam o título mais alarmista (consequência em CAIXA ALTA) —
+# os de maior chance real de cancelamento/desvio
+_LOUD_TITLE_KINDS = {
+    "rwy_closed", "twr_closed", "windshear", "thunderstorm", "severe_wx", "convective",
+}
 
-def _pick_cover_title(city: str, problema: str, severity: str, when: str) -> str:
-    template = random.choice(_TITLE_TEMPLATES[severity])
+
+def _pick_cover_title(city: str, problema: str, severity: str, headline_kind: str,
+                       when_dt: datetime, now: datetime | None = None) -> str:
+    templates = _TITLE_TEMPLATES[severity]
+    if headline_kind not in _LOUD_TITLE_KINDS:
+        # evento real mas menos disruptivo: só os templates sóbrios
+        templates = [t for t in templates if "{consequencia_caps}" not in t]
+    template = random.choice(templates)
     problema_cap = problema[0].upper() + problema[1:]
-    return template.format(city=city, problema=problema, Problema=problema_cap, when=when)
+    return template.format(
+        city=city, problema=problema, Problema=problema_cap,
+        when=_when_phrase(when_dt, now), when_short=_when_phrase_short(when_dt, now),
+        consequencia_caps=_CONSEQUENCE_CAPS.get(headline_kind, "ATRASOS"),
+    )
 
 
 _NAV_AID_NAME = {
@@ -490,8 +568,7 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
     problema = _HEADLINE_LABEL_SENTENCE[headline_kind][0].lower() + _HEADLINE_LABEL_SENTENCE[headline_kind][1:]
     if causa:
         problema += f" {causa}"
-    when = _when_phrase(when_dt)
-    cover_title = _pick_cover_title(airport['city'], problema, severity, when)
+    cover_title = _pick_cover_title(airport['city'], problema, severity, headline_kind, when_dt)
 
     background_category = "weather" if headline_kind in WEATHER_KINDS else _ILLUSTRATION_BY_KIND[headline_kind]
 
