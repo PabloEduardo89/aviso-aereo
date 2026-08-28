@@ -14,11 +14,12 @@ Call-to-Action padrão pra seguir a conta (`render_cta_slide`), acrescentado
 por `render_post_slides` — quem monta o PostContent (content.py,
 fallback_content.py) nunca inclui o CTA na própria lista de slides.
 """
+import hashlib
 import os
 import random
 from datetime import datetime, timezone
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 import news_images
 import style
@@ -217,11 +218,18 @@ def render_photo_slide(background_img, credit, accent, kicker_text, title, subti
     return out_path
 
 
-def render_cta_slide(accent, out_path=None) -> str:
+def render_cta_slide(accent, out_path=None, used_photo_ids: set | None = None) -> str:
     """Último slide padrão de TODO carrossel (regra fixa, 2026-08-27) — convite
-    direto pra seguir a conta, sempre no mesmo molde visual dos demais slides."""
-    query = random.choice(_CTA_IMAGE_QUERIES)
-    result = fetch_pexels_photo(query)
+    direto pra seguir a conta, sempre no mesmo molde visual dos demais slides.
+    `used_photo_ids` (ids de foto Pexels já usados nos slides anteriores) garante
+    que o CTA também não repete nenhuma imagem do carrossel."""
+    queries = _CTA_IMAGE_QUERIES[:]
+    random.shuffle(queries)
+    result = None
+    for query in queries:
+        result = fetch_pexels_photo(query, exclude_ids=used_photo_ids)
+        if result is not None:
+            break
     if result is None:
         # sem chave/instável no momento — cai numa cor sólida de marca em vez de
         # deixar o slide sem imagem nenhuma
@@ -269,26 +277,72 @@ def render_cta_slide(accent, out_path=None) -> str:
     return out_path
 
 
-def _resolve_slide_background(post: PostContent, slide: SlideSpec, used_photo_ids: set):
-    """slide.image_query is None -> capa (1º slide) — tenta primeiro uma foto
-    REAL da notícia (ver style.wants_real_news_photo/news_images), quando o
-    evento parece genuinamente noticioso; senão usa o fundo "oficial" do
-    post (foto curada do aeroporto / satélite / ilustração, ver
-    backgrounds.get_background_for_post), como já era — pedido do usuário,
-    2026-08-28. Qualquer image_query preenchido busca uma foto real no
-    Pexels pela palavra-chave daquele slide especificamente (regra do
-    usuário, 2026-08-27: cada slide usa a foto da SUA própria palavra-chave,
-    nunca repete a mesma foto dentro do carrossel)."""
+def _img_fingerprint(img: Image.Image) -> str:
+    """Impressão digital do CONTEÚDO da imagem já cortada pro slide — serve pra
+    detectar que dois slides receberam exatamente a mesma foto de um caminho que
+    não tem id (foto curada do aeroporto, foto genérica da biblioteca, satélite,
+    ilustração, foto de notícia). O Pexels já é desduplicado por id em
+    fetch_pexels_photo; isto cobre todo o resto."""
+    return hashlib.md5(img.convert("RGB").tobytes()).hexdigest()
+
+
+def _distinct_generic_photo(headline_kind, used_fps: set, max_tries: int = 8):
+    """Insiste em backgrounds.get_generic_photo (que sorteia entre os arquivos da
+    categoria) até achar uma foto cujo conteúdo ainda não apareceu neste
+    carrossel. (None, None) se a categoria não tiver nenhum arquivo inédito."""
+    for _ in range(max_tries):
+        g = get_generic_photo(headline_kind)
+        if g is None:
+            return None, None
+        img, credit = g
+        if _img_fingerprint(img) not in used_fps:
+            return img, credit
+    return None, None
+
+
+def _differentiate(img: Image.Image, seed: int) -> Image.Image:
+    """Último recurso, quando NÃO há nenhuma imagem real distinta sobrando
+    (Pexels fora do ar E biblioteca genérica esgotada): espelha e ajusta o
+    brilho por um passo dependente de quantas colisões já houve, só pra não
+    sair dois slides pixel a pixel idênticos. Continua sendo uma foto real —
+    não vira duotone/filtro que pareça alerta."""
+    out = ImageOps.mirror(img) if seed % 2 else img
+    factor = 1.0 - 0.08 * ((seed % 3) + 1)   # 0.92, 0.84, 0.76, ...
+    return ImageEnhance.Brightness(out).enhance(factor)
+
+
+def _register(img: Image.Image, credit, used_fps: set):
+    used_fps.add(_img_fingerprint(img))
+    return img, credit
+
+
+def _resolve_slide_background(post: PostContent, slide: SlideSpec,
+                               used_photo_ids: set, used_fallback_fps: set):
+    """Devolve (imagem, crédito) pro fundo de UM slide, com a GARANTIA de que a
+    imagem nunca é igual à de outro slide do mesmo carrossel (pedido do usuário,
+    2026-08-28).
+
+    - `slide.image_query is None` (1º slide / capa): tenta primeiro uma foto REAL
+      da notícia (style.wants_real_news_photo / news_images) quando o evento é
+      genuinamente noticioso; senão o fundo "oficial" do post (foto curada do
+      aeroporto / satélite / ilustração, ver backgrounds.get_background_for_post).
+    - `slide.image_query` preenchido: foto real no Pexels pela palavra-chave
+      DAQUELE slide (regra 2026-08-27), com `used_photo_ids` como exclusão dura.
+      Se o Pexels não devolver nada inédito, cai pro fundo oficial / foto
+      genérica — mas só se ainda não tiver sido usado neste carrossel; se já
+      tiver, procura outra foto genérica inédita e, em último caso, aplica uma
+      diferenciação mínima (espelho/brilho) pra não repetir pixel a pixel."""
+    when_dt = post.when_dt or datetime.now(timezone.utc)
+
     if slide.image_query is None:
         if style.wants_real_news_photo(post):
             required, any_of = style.build_news_search(post)
-            when_dt = post.when_dt or datetime.now(timezone.utc)
             news = news_images.search_news_photo(required, any_of, when_dt)
             if news is not None:
                 img, credit, _source_url = news
-                return img, credit
+                return _register(img, credit, used_fallback_fps)
         img, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
-        return img, credit
+        return _register(img, credit, used_fallback_fps)
 
     result = fetch_pexels_photo(slide.image_query, exclude_ids=used_photo_ids)
     if result is not None:
@@ -296,23 +350,40 @@ def _resolve_slide_background(post: PostContent, slide: SlideSpec, used_photo_id
         used_photo_ids.add(photo_id)
         return img, credit
 
-    # Pexels indisponível/sem chave — cai pro fundo "oficial" do post em vez de
-    # deixar o slide sem nenhuma imagem
+    # Pexels indisponível/sem chave/esgotado pra essa palavra-chave — cai pro
+    # fundo "oficial" do post, mas NUNCA repetido entre slides.
     img, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
-    return img, credit
+    if _img_fingerprint(img) not in used_fallback_fps:
+        return _register(img, credit, used_fallback_fps)
+
+    alt_img, alt_credit = _distinct_generic_photo(post.headline_kind, used_fallback_fps)
+    if alt_img is not None:
+        return _register(alt_img, alt_credit, used_fallback_fps)
+
+    print(f"[slide] AVISO: sem imagem real distinta pro slide '{slide.image_query}' "
+          f"de {post.dedup_key} — Pexels fora do ar e biblioteca genérica esgotada; "
+          f"aplicando diferenciação mínima pra não repetir a imagem")
+    img = _differentiate(img, len(used_fallback_fps))
+    return _register(img, credit, used_fallback_fps)
 
 
 def render_post_slides(post: PostContent) -> list:
     """Gera todos os slides do post — cada item de `post.slides` no molde CAPA
     (foto própria + degradê + kicker + título curto) e, por último, sempre o
     slide de Call-to-Action padrão (regra fixa, 2026-08-27: TODO carrossel,
-    informativo ou educativo, termina com o convite pra seguir a conta)."""
+    informativo ou educativo, termina com o convite pra seguir a conta).
+
+    `used_photo_ids` (Pexels, por id) + `used_fallback_fps` (todo o resto, por
+    impressão digital do conteúdo) são acumulados slide a slide e garantem que
+    o carrossel inteiro — inclusive o CTA — nunca repete uma imagem."""
     accent = _accent(post.severity)
     used_photo_ids = set()
+    used_fallback_fps = set()
     paths = []
 
     for i, slide in enumerate(post.slides, start=1):
-        background_img, credit = _resolve_slide_background(post, slide, used_photo_ids)
+        background_img, credit = _resolve_slide_background(
+            post, slide, used_photo_ids, used_fallback_fps)
         out_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_{i}.png")
         paths.append(render_photo_slide(
             background_img, credit, accent, slide.kicker_text, slide.title, slide.subtitle,
@@ -320,7 +391,7 @@ def render_post_slides(post: PostContent) -> list:
         ))
 
     cta_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_{len(post.slides) + 1}_cta.png")
-    paths.append(render_cta_slide(accent, out_path=cta_path))
+    paths.append(render_cta_slide(accent, out_path=cta_path, used_photo_ids=used_photo_ids))
     return paths
 
 
@@ -469,6 +540,7 @@ def render_post_slides_variation(post: PostContent, mold: str, fmt_state: dict) 
     when_dt = post.when_dt or datetime.now(timezone.utc)
 
     bg = credit = None
+    used_photo_ids = set()   # os moldes de variação têm 1 só foto (a capa), mas o CTA usa isto pra não repeti-la
     if style.wants_real_news_photo(post):
         required, any_of = style.build_news_search(post)
         news = news_images.search_news_photo(required, any_of, when_dt)
@@ -479,7 +551,8 @@ def render_post_slides_variation(post: PostContent, mold: str, fmt_state: dict) 
         query = style.pick_image_query(post.headline_kind, fmt_state)
         result = fetch_pexels_photo(query)
         if result is not None:
-            bg, credit, _ = result
+            bg, credit, _pexels_id = result
+            used_photo_ids.add(_pexels_id)
         else:
             bg, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
 
@@ -503,7 +576,7 @@ def render_post_slides_variation(post: PostContent, mold: str, fmt_state: dict) 
         paths.append(exp_path)
 
     cta_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_{len(paths) + 1}_cta.png")
-    render_cta_slide(accent, out_path=cta_path)
+    render_cta_slide(accent, out_path=cta_path, used_photo_ids=used_photo_ids)
     paths.append(cta_path)
     return paths
 

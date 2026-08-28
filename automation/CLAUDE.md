@@ -5,6 +5,48 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## Garantia dura: nenhum slide repete imagem dentro do carrossel (2026-08-28, 4ª passada)
+
+Pedido do usuário: os carrosséis não podem ter a mesma imagem em slides
+diferentes — cada slide precisa de uma imagem própria, ainda assim REAL do
+ocorrido (foto de notícia > Pexels, como já combinado); pra curiosidade/
+educativo a regra é a mesma, buscando a foto pelas palavras-chave DAQUELE
+slide específico (isso já era a arquitetura — `SlideSpec.image_query` /
+`EduSlide.image_query`, um por slide). O que faltava era a *não-repetição*
+ser garantida em vez de "melhor esforço". Corrigido em 3 pontos:
+
+- **`backgrounds.fetch_pexels_photo`**: pedia só 10 resultados, sorteava
+  entre os 6 primeiros e, se `exclude_ids` esvaziasse o pool, **voltava a
+  sortear da lista inteira** (podia devolver foto já usada). Agora
+  `per_page=80` + até 2 páginas, filtra `exclude_ids` como **exclusão dura**
+  (nunca devolve id já usado — se a 1ª página inteira já foi usada, vai pra
+  2ª; só devolve `None` quando não sobra nada inédito pra aquela busca),
+  sorteia entre os `PEXELS_RELEVANCE_WINDOW` (15) primeiros inéditos e
+  itera se um download específico falhar.
+- **`slide._resolve_slide_background`**: quando o Pexels não devolvia nada,
+  TODO slide caía no mesmo "fundo oficial do post" (foto curada do
+  aeroporto / satélite / ilustração) → imagem idêntica em vários slides.
+  Agora rastreia, além dos ids do Pexels (`used_photo_ids`), uma impressão
+  digital do conteúdo de toda imagem sem id (`used_fallback_fps` — foto de
+  notícia, curada, genérica, satélite, ilustração). Se o fundo oficial já
+  foi usado num slide anterior: tenta outra foto da biblioteca genérica
+  (`_distinct_generic_photo`) e, só em último caso (Pexels fora do ar E
+  biblioteca genérica esgotada — hoje ela só tem 2 fotos no total), aplica
+  uma diferenciação mínima (espelho + passo de brilho, `_differentiate`) só
+  pra não sair dois slides pixel a pixel idênticos, logando um AVISO — não
+  vira duotone/filtro que pareça alerta, continua sendo foto real. Esse
+  último caso não deveria acontecer em produção (a `PEXELS_API_KEY` está
+  configurada); o AVISO no log é sinal de que a biblioteca genérica precisa
+  de mais fotos.
+- **`slide.render_cta_slide`**: buscava no Pexels **sem** `exclude_ids` —
+  podia colidir com um slide de conteúdo. Agora recebe `used_photo_ids` do
+  carrossel e tenta as `_CTA_IMAGE_QUERIES` em ordem aleatória até uma dar
+  foto inédita. `render_post_slides` e `render_post_slides_variation`
+  passam o conjunto acumulado.
+
+Testado offline (mock de Pexels saudável e de Pexels 100% fora do ar, 8
+slides com a MESMA `image_query`): 0 imagens repetidas nos dois cenários.
+
 ## Foto REAL da notícia, automática, quando o evento é noticioso (2026-08-28, 3ª passada)
 
 Pedido do usuário: "sempre imagens reais da notícia trazida, sempre que isso

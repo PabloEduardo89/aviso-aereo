@@ -222,41 +222,62 @@ def get_generic_photo(headline_kind: str | None) -> tuple | None:
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY")
 PEXELS_SEARCH_URL = "https://api.pexels.com/v1/search"
 
+PEXELS_PER_PAGE = 80    # máximo do Pexels — pool fundo o bastante pra um carrossel inteiro nunca repetir
+PEXELS_MAX_PAGES = 2    # se a 1ª página inteira já estiver em exclude_ids, tenta a 2ª antes de desistir
+PEXELS_RELEVANCE_WINDOW = 15  # sorteia entre os N primeiros resultados (já filtrados) — variedade sem perder o tema
+
 
 def fetch_pexels_photo(query: str, exclude_ids: set | None = None) -> tuple | None:
     """Busca uma foto real no Pexels que combine com a palavra-chave específica de UM
     slide — regra do usuário (2026-08-27): cada slide de um carrossel de vários slides
     usa a foto da SUA PRÓPRIA palavra-chave (o radical/dupla de palavras mais central
     daquele slide), não a mesma foto do post inteiro — garante coerência slide a slide
-    e evita repetir imagem entre slides/posts. `exclude_ids` (ids de foto já usados
-    nesse mesmo carrossel) evita pegar a mesma foto de novo se a busca trouxer
-    resultados repetidos. Devolve (imagem já cortada pro slide, crédito do fotógrafo,
-    id da foto) ou None se a busca falhar ou não houver PEXELS_API_KEY configurada —
-    quem chama trata o fallback."""
+    e evita repetir imagem entre slides/posts.
+
+    `exclude_ids` (ids de foto já usados nesse mesmo carrossel) é uma GARANTIA, não um
+    "melhor esforço": esta função NUNCA devolve uma foto cujo id já esteja em
+    `exclude_ids`. Se toda a 1ª página de resultados já tiver sido usada (acontece
+    quando dois slides têm palavra-chave igual/parecida), busca a página seguinte;
+    só devolve None quando realmente não sobra nenhuma foto inédita pra essa busca —
+    aí quem chama trata o fallback (ver slide._resolve_slide_background).
+
+    Devolve (imagem já cortada pro slide, crédito do fotógrafo, id da foto) ou None
+    (sem PEXELS_API_KEY, rede fora, busca vazia ou pool esgotado)."""
     if not PEXELS_API_KEY:
         return None
-    try:
-        resp = requests.get(
-            PEXELS_SEARCH_URL,
-            headers={"Authorization": PEXELS_API_KEY},
-            params={"query": query, "per_page": 10, "orientation": "portrait"},
-            timeout=REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        photos = resp.json().get("photos") or []
-    except requests.RequestException:
-        return None
-    if not photos:
-        return None
-    pool = [p for p in photos if not exclude_ids or p["id"] not in exclude_ids] or photos
-    photo = random.choice(pool[:6])
-    try:
-        img_resp = requests.get(photo["src"]["portrait"], timeout=REQUEST_TIMEOUT)
-        img_resp.raise_for_status()
-    except requests.RequestException:
-        return None
-    img = Image.open(BytesIO(img_resp.content)).convert("RGB")
-    return cover_resize(img), photo["photographer"], photo["id"]
+    exclude_ids = exclude_ids or set()
+    for page in range(1, PEXELS_MAX_PAGES + 1):
+        try:
+            resp = requests.get(
+                PEXELS_SEARCH_URL,
+                headers={"Authorization": PEXELS_API_KEY},
+                params={"query": query, "per_page": PEXELS_PER_PAGE, "page": page,
+                        "orientation": "portrait"},
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            photos = resp.json().get("photos") or []
+        except requests.RequestException:
+            return None
+        if not photos:
+            break
+
+        # mantém a ordem de relevância do Pexels, tira o que já foi usado, e
+        # sorteia entre os primeiros inéditos — variedade slide a slide sem
+        # cair pra fotos fora do tema. Se a página inteira já foi usada, o
+        # candidates fica vazio e o loop vai pra próxima página.
+        candidates = [p for p in photos if p["id"] not in exclude_ids][:PEXELS_RELEVANCE_WINDOW]
+        random.shuffle(candidates)
+        for photo in candidates:
+            try:
+                img_resp = requests.get(photo["src"]["portrait"], timeout=REQUEST_TIMEOUT)
+                img_resp.raise_for_status()
+            except requests.RequestException:
+                continue  # essa foto não baixou — tenta a próxima, não deixa o slide sem imagem
+            img = Image.open(BytesIO(img_resp.content)).convert("RGB")
+            return cover_resize(img), photo["photographer"], photo["id"]
+
+    return None
 
 
 def get_background_for_post(icao: str, category: str, headline_kind: str | None = None) -> tuple:
