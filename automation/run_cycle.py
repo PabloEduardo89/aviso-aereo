@@ -25,6 +25,8 @@ import sys
 import time
 from datetime import datetime, timezone
 
+import format_state
+import style
 from airports import AIRPORTS
 from content import build_post_content
 from fallback_content import TOPICS as FALLBACK_TOPICS
@@ -32,7 +34,7 @@ from fallback_content import build_fallback_post
 from fetch_data import FetchError, fetch_metar, fetch_notam
 from publish import create_container, get_publishing_credentials, host_images_on_github, publish_container
 from rules import evaluate_airport
-from slide import render_post_slides
+from slide import render_post_slides, render_post_slides_classico
 from state import get_meta, is_posted, load_state, mark_posted, save_state, set_meta
 
 # limite conservador de posts novos por execução (agendada de hora em hora) —
@@ -107,6 +109,7 @@ def maybe_build_fallback(state: dict, now: datetime) -> object | None:
 
 def run():
     state = load_state()
+    fmt_state = format_state.load()
     now = datetime.now(timezone.utc)
     candidates = collect_candidates(state)
 
@@ -138,11 +141,23 @@ def run():
             print(f"Aguardando {MIN_INTERVAL_SECONDS}s antes do próximo post (espaçamento entre publicações)...")
             time.sleep(MIN_INTERVAL_SECONDS)
 
-        print(f"[{post.icao}] publicando ({post.dedup_key})")
+        # molde clássico só entra pra posts REAIS (dados de METAR/NOTAM) — o
+        # educativo de fallback continua sempre no molde único fotográfico
+        # (pedido do usuário, 2026-08-28: a alternância é "uma mini linha de
+        # edição" pros alertas de verdade, não mexe no fallback).
+        is_real = post.icao != "_FALLBACK"
+        mold = style.next_mold(fmt_state) if is_real else "moderno"
+
+        print(f"[{post.icao}] publicando ({post.dedup_key}) — molde {mold}")
         try:
-            paths = render_post_slides(post)
+            if mold == "classico":
+                paths = render_post_slides_classico(post, fmt_state)
+                caption = style.apply_caption_opening(post, fmt_state)
+            else:
+                paths = render_post_slides(post)
+                caption = post.caption
             image_urls = host_images_on_github(paths, post.icao)
-            creation_id = create_container(ig_user_id, page_token, image_urls, post.caption)
+            creation_id = create_container(ig_user_id, page_token, image_urls, caption)
             media_id = publish_container(ig_user_id, page_token, creation_id)
         except Exception as err:
             print(f"[{post.icao}] ERRO ao publicar: {err}")
@@ -156,6 +171,7 @@ def run():
         else:
             set_meta(state, "last_real_post_at", posted_at)  # espaça o PRÓXIMO educativo por 6h também
         save_state(state)  # salva a cada post — se o job cair no meio, o que já saiu fica registrado
+        format_state.save(fmt_state)  # idem pro estado de rotação de formato/molde
         posted_count += 1
         print(f"[{post.icao}] publicado: media_id={media_id}")
 

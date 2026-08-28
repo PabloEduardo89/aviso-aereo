@@ -16,10 +16,12 @@ fallback_content.py) nunca inclui o CTA na própria lista de slides.
 """
 import os
 import random
+from datetime import datetime, timezone
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
-from backgrounds import fetch_pexels_photo, get_background_for_post
+import style
+from backgrounds import duotone, fetch_pexels_photo, get_background_for_post
 from content import PostContent, SlideSpec
 
 WIDTH, HEIGHT = 1080, 1350
@@ -60,6 +62,11 @@ _CTA_IMAGE_QUERIES = [
     "sunset sky airplane", "airport runway night", "airplane takeoff clouds",
     "control tower sunset", "airplane window clouds",
 ]
+
+
+def _hex_to_rgb(hex_color: str) -> tuple:
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
 
 
 def _font(role, size):
@@ -304,6 +311,115 @@ def render_post_slides(post: PostContent) -> list:
 
     cta_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_{len(post.slides) + 1}_cta.png")
     paths.append(render_cta_slide(accent, out_path=cta_path))
+    return paths
+
+
+# ------------------------------------------------------- MOLDE "CLÁSSICO" ---
+# Segundo molde visual pros posts de alerta real (pedido do usuário,
+# 2026-08-28) — duotone vermelho na capa + explicativo em fundo branco
+# (retoma o design pré-2026-08-27), com variações determinísticas amarradas
+# aos dados do evento (ver style.py). Convive com o molde único fotográfico
+# acima ("moderno") — a escolha de qual dos dois usar em cada post é feita
+# por style.next_mold, fora daqui; este módulo não decide isso sozinho.
+
+COLOR_CARD_BG_CLASSICO = "#F1F0EC"
+COLOR_LINE_CLASSICO = "#DDDDDD"
+
+
+def render_explicativo_classico(ctx: "style.EventContext", accent: str, headline_label: str,
+                                 out_path: str | None = None) -> str:
+    """2º slide do molde clássico — fundo branco, serifado, só aparece quando
+    style.wants_explicativo_slide diz que há contexto suficiente (aeronave,
+    vítimas/sem vítimas, resposta de emergência, duração prevista — ver
+    style.EventContext)."""
+    img = Image.new("RGB", (WIDTH, HEIGHT), COLOR_WHITE)
+    draw = ImageDraw.Draw(img)
+    max_w = WIDTH - 2 * MARGIN
+    y = MARGIN
+
+    font_badge = _font("sans_bold", 26)
+    badge_text = "@AVISOAEREO"
+    badge_w = draw.textlength(badge_text, font=font_badge) + 48
+    draw.rounded_rectangle([(MARGIN, y), (MARGIN + badge_w, y + 56)], radius=28, fill=accent)
+    draw.text((MARGIN + 24, y + 28), badge_text, font=font_badge, fill=COLOR_WHITE, anchor="lm")
+    y += 56 + 44
+
+    font_heading = _font("serif_bold", 44)
+    for line in _wrap_text(draw, headline_label, font_heading, max_w):
+        draw.text((MARGIN, y), line, font=font_heading, fill=accent)
+        y += 54
+    y += 14
+    draw.line([(MARGIN, y), (WIDTH - MARGIN, y)], fill=COLOR_LINE_CLASSICO, width=2)
+    y += 36
+
+    font_label = _font("sans_bold", 24)
+    font_body = _font("serif", 32)
+
+    def block(label, value):
+        nonlocal y
+        draw.text((MARGIN, y), label, font=font_label, fill="#8A8A8A")
+        y += 34
+        for line in _wrap_text(draw, value, font_body, max_w):
+            draw.text((MARGIN, y), line, font=font_body, fill="#222222")
+            y += 42
+        y += 30
+
+    if ctx.aircraft_id:
+        block("AERONAVE", ctx.aircraft_id)
+    if ctx.casualties_info:
+        block("VÍTIMAS", ctx.casualties_info)
+    if ctx.response_action:
+        block("RESPOSTA", ctx.response_action)
+    if ctx.duration_text:
+        block("DURAÇÃO PREVISTA", ctx.duration_text)
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    if out_path is None:
+        out_path = os.path.join(OUTPUT_DIR, "explicativo_classico.png")
+    img.save(out_path, "PNG")
+    return out_path
+
+
+def render_post_slides_classico(post: PostContent, fmt_state: dict) -> list:
+    """Gera os slides do molde clássico pra este post — capa duotone (foto
+    real tratada, cor por style.RED_BY_TIER) sempre, mais o explicativo
+    (fundo branco) só quando há contexto suficiente (ver
+    style.wants_explicativo_slide), e sempre o CTA padrão por último. Muta
+    `fmt_state` em memória (índices das rotações) — quem chama é responsável
+    por persistir (format_state.save), igual ao dedup de state.py."""
+    tier = style.severity_tier(post.headline_kind)
+    accent = style.RED_BY_TIER[tier]
+    badge = style.category_badge(post.headline_kind)
+    when_dt = post.when_dt or datetime.now(timezone.utc)
+
+    query = style.pick_image_query(post.headline_kind, fmt_state)
+    result = fetch_pexels_photo(query)
+    if result is not None:
+        bg, credit, _ = result
+    else:
+        bg, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
+
+    if style.is_nighttime(when_dt):
+        bg = ImageEnhance.Brightness(bg).enhance(0.55)
+    bg = duotone(bg, light=_hex_to_rgb(accent))
+
+    fmt = style.next_title_format(fmt_state)
+    title = style.title_format_classico(fmt, post.city, post.headline_kind, when_dt)
+
+    paths = []
+    capa_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_1_capa_classico.png")
+    render_photo_slide(bg, credit, accent, badge, title, out_path=capa_path)
+    paths.append(capa_path)
+
+    ctx = style.extract_event_context(post)
+    if style.wants_explicativo_slide(ctx):
+        exp_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_2_explicativo_classico.png")
+        render_explicativo_classico(ctx, accent, post.headline, out_path=exp_path)
+        paths.append(exp_path)
+
+    cta_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_{len(paths) + 1}_cta.png")
+    render_cta_slide(accent, out_path=cta_path)
+    paths.append(cta_path)
     return paths
 
 

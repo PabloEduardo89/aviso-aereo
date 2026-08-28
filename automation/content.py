@@ -371,6 +371,11 @@ class PostContent:
     background_category: str    # fundo do slide[0] — "weather" (satélite) ou uma chave de ilustração
     # (ver _ILLUSTRATION_BY_KIND); só usado quando slides[0].image_query é None
     dedup_key: str            # identifica a condição pra automação não postar a mesma coisa 2x (ver state.py)
+    # campos abaixo existem só pro molde alternativo "clássico" (ver style.py) —
+    # o molde único fotográfico ("moderno", slide.render_post_slides) não usa nenhum deles.
+    when_dt: datetime | None = None      # momento da condição (quando começou/está em vigor) em UTC
+    duration_text: str | None = None     # validade formatada do NOTAM, quando há data real de término (senão None)
+    raw_snippet: str | None = None       # texto bruto do METAR/NOTAM de origem — usado pra detectar aeronave/resposta/vítimas
 
 
 def _metar_updated_label(metar: MetarResult) -> str:
@@ -542,6 +547,9 @@ def _build_one_post(icao, airport, metar, bullets, headline_kind, dedup_key,
         slides=slides,
         background_category=background_category,
         dedup_key=dedup_key,
+        when_dt=when_dt,
+        duration_text=duracao_slide,
+        raw_snippet=raw_snippet,
     )
 
 

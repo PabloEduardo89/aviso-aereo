@@ -5,6 +5,79 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## Segundo molde visual "clássico" (convive com o molde único) — 2026-08-28
+
+Pedido do usuário: variação sistemática determinística (nunca sorteio livre
+sem critério) nos posts de alerta real, E um segundo molde visual — "duotone
+vermelho na capa + explicativo em fundo branco" — que **convive** com o
+molde único fotográfico atual ("moderno", ver seção "Redesign completo do
+carrossel" abaixo), alternando entre os dois post a post ("uma mini linha de
+edição"), sem excluir nenhum dos dois. Não mexe no molde do post educativo de
+fallback, que continua sempre no molde único.
+
+- **`style.py`** (novo) — o motor de decisão. Tudo determinístico, amarrado
+  aos dados reais do evento (`headline_kind`, `when_dt`, texto bruto do
+  NOTAM/METAR):
+  - `next_mold(state)` — alterna estritamente entre `"moderno"` e
+    `"classico"`, nunca repete o anterior.
+  - `pick_image_query` — mapeia `headline_kind` → categoria de imagem
+    (`neblina` / `tempestade` / `pista_generica`) → gira ciclicamente entre
+    2-3 palavras-chave Pexels daquela categoria (`IMAGE_BANK`), nunca a
+    mesma duas vezes seguidas dentro da mesma categoria.
+  - `severity_tier` + `RED_BY_TIER` — 3 tons de vermelho (`alta` mais
+    saturado/escuro pra pista/torre fechada e tesoura de vento, `media` o
+    vermelho padrão da marca pra clima adverso, `baixa` mais suave pra
+    aux. de navegação inativo) — sempre a mesma família de vermelho, nunca
+    cor fora da paleta.
+  - `category_badge` — selo curto (“PISTA”, “TORRE”, “VISIBILIDADE”,
+    “NOTAM” etc.) — reaproveita o slot de *kicker* que já existe no molde
+    fotográfico (`render_photo_slide`), em vez de inventar um elemento
+    visual novo — por isso já nasce discreto, sem competir com o título.
+  - `EventContext` + `extract_event_context` + `wants_explicativo_slide` —
+    conta quantos campos de contexto estão preenchidos (aeronave, vítimas/
+    sem vítimas, ação de resposta, duração prevista — os 3 primeiros
+    detectados por regex no texto bruto do NOTAM, o último já vem pronto de
+    `content.py`) e só manda o 2º slide (explicativo) quando o total é ≥ 2.
+    Na prática, a maioria dos NOTAMs de rotina não tem esses campos (não é
+    um dado que o DECEA costuma publicar) — o slide explicativo tende a
+    aparecer só em casos realmente ricos em contexto, como o NOTAM real do
+    acidente de 27/08 em SBRJ (`RWY 02R/20L CLSD DEVIDO ACFT NA PISTA`),
+    usado como caso de teste.
+    **Lição da 1ª versão**: a regex de vítimas capturava só a palavra
+    (“FERIDOS”), perdendo a negação — um NOTAM com “SEM FERIDOS” virava
+    “Vítimas: Feridos” no slide, informação de segurança invertida. Corrigido
+    pra capturar o “SEM” junto quando presente.
+  - `is_nighttime` — período da noite/madrugada (Brasília) → escurece a foto
+    (`ImageEnhance.Brightness`, 0.55) antes do duotone.
+  - `title_format_classico` + `next_title_format` — 3 formatos (A:
+    "`{cidade}: {Problema}`", B: "`{consequência} em {cidade}`" — reaproveita
+    `_IMPACT_TITLE`, C: "`Desde {horário}, {problema} em {cidade}`"), giram
+    ciclicamente, nunca repetem o formato anterior.
+  - `caption_opening` + `next_caption_opening` + `apply_caption_opening` — 3
+    estilos de abertura da legenda (pergunta / fato / urgência), giram
+    ciclicamente; `apply_caption_opening` troca só a 1ª linha da legenda já
+    montada por `content.py` (mantém bullets/impacto/fonte/hashtags
+    intactos).
+- **`format_state.py`** (novo) — persiste os índices de rotação
+  (`state/last_post_format.json`, comitado igual a `posted.json`, ver
+  `commit_state.py`) — sem isso, cada execução do runner (que começa do
+  zero) perderia a memória da última escolha.
+- **`slide.py`** — `render_explicativo_classico` (fundo branco, serifado,
+  revive o layout pré-2026-08-27 — ver histórico) e
+  `render_post_slides_classico` (orquestra capa duotone + explicativo
+  opcional + CTA padrão, reaproveitando `render_photo_slide`/
+  `render_cta_slide` que já existiam — a capa clássica é literalmente o
+  mesmo `render_photo_slide`, só que com a foto pré-tratada em duotone e o
+  `accent` vindo de `RED_BY_TIER` em vez do vermelho fixo).
+- **`run_cycle.py`** — decide o molde só pra posts reais
+  (`post.icao != "_FALLBACK"`) a cada publicação; o fallback educativo
+  sempre usa o molde único. `publish.py --stage` ganhou `--mold
+  moderno|classico` opcional pra forçar um dos dois manualmente (sem a
+  flag, usa a mesma rotação automática).
+- Campos novos em `PostContent` (`when_dt`, `duration_text`, `raw_snippet`)
+  existem só pra alimentar o molde clássico — o molde único não usa nenhum
+  deles.
+
 ## Título de capa com QUANDO (dia + data + período do dia) — 2026-08-27
 
 Pedido do usuário, revendo o post que saiu: o título precisa deixar

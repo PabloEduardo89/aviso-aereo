@@ -25,12 +25,14 @@ import sys
 import requests
 from dotenv import load_dotenv
 
+import format_state
+import style
 from airports import AIRPORTS
 from content import build_post_content
 from fetch_data import FetchError, fetch_metar, fetch_notam
 from git_utils import commit_and_push
 from rules import evaluate_airport
-from slide import render_post_slides
+from slide import render_post_slides, render_post_slides_classico
 
 load_dotenv()
 
@@ -122,13 +124,15 @@ def publish_container(ig_user_id: str, token: str, creation_id: str) -> str:
     return result["id"]
 
 
-def stage_post(icao: str, index: int = 0):
+def stage_post(icao: str, index: int = 0, mold: str | None = None):
     """Monta o post (dados + slides), hospeda as imagens e cria o container —
     tudo isso sem tornar nada público. Um aeroporto pode ter mais de um post
     relevante ao mesmo tempo (motivos distintos, ver content.py) — `index`
     escolhe qual deles estagear; os outros ficam listados no retorno pra você
-    saber que existem. Devolve (creation_id, image_urls, caption, ig_user_id,
-    page_token, total_posts)."""
+    saber que existem. `mold` força "moderno" ou "classico" (ver style.py);
+    None (padrão) deixa a rotação automática de format_state decidir, igual
+    ao ciclo automático faria. Devolve (creation_id, image_urls, caption,
+    ig_user_id, page_token, total_posts, mold_usado)."""
     airport = next((a for a in AIRPORTS if a["code"] == icao), None)
     if airport is None:
         raise PublishError(f"{icao} não está em airports.py")
@@ -150,13 +154,21 @@ def stage_post(icao: str, index: int = 0):
         raise PublishError(f"{icao} só tem {len(posts)} post(s) relevante(s) agora (índice {index} não existe)")
 
     post = posts[index]
-    paths = render_post_slides(post)
+    fmt_state = format_state.load()
+    chosen_mold = mold or style.next_mold(fmt_state)
+    if chosen_mold == "classico":
+        paths = render_post_slides_classico(post, fmt_state)
+        caption = style.apply_caption_opening(post, fmt_state)
+    else:
+        paths = render_post_slides(post)
+        caption = post.caption
+    format_state.save(fmt_state)
     image_urls = host_images_on_github(paths, icao)
 
     _, page_token, ig_user_id = get_publishing_credentials()
-    creation_id = create_container(ig_user_id, page_token, image_urls, post.caption)
+    creation_id = create_container(ig_user_id, page_token, image_urls, caption)
 
-    return creation_id, image_urls, post.caption, ig_user_id, page_token, len(posts)
+    return creation_id, image_urls, caption, ig_user_id, page_token, len(posts), chosen_mold
 
 
 if __name__ == "__main__":
@@ -164,18 +176,28 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 3 or sys.argv[2] not in ("--stage", "--go"):
         print("Uso:")
-        print("  python publish.py <ICAO> --stage [indice]   (monta e prepara, não publica)")
+        print("  python publish.py <ICAO> --stage [indice] [--mold moderno|classico]")
+        print("                                              (monta e prepara, não publica;")
+        print("                                               sem --mold, a rotação automática decide)")
         print("  python publish.py <ICAO> --go <creation_id> (publica de fato)")
         sys.exit(1)
 
     icao_arg = sys.argv[1].upper()
 
     if sys.argv[2] == "--stage":
-        index_arg = int(sys.argv[3]) if len(sys.argv) > 3 else 0
-        creation_id, image_urls, caption, ig_user_id, page_token, total = stage_post(icao_arg, index_arg)
+        rest = sys.argv[3:]
+        mold_arg = None
+        if "--mold" in rest:
+            mold_pos = rest.index("--mold")
+            mold_arg = rest[mold_pos + 1]
+            rest = rest[:mold_pos] + rest[mold_pos + 2:]
+        index_arg = int(rest[0]) if rest else 0
+        creation_id, image_urls, caption, ig_user_id, page_token, total, mold_used = stage_post(
+            icao_arg, index_arg, mold=mold_arg)
         if total > 1:
             print(f"{icao_arg} tem {total} posts relevantes agora (motivos distintos) — "
                   f"estageando o índice {index_arg}. Pra ver os outros: --stage 1, --stage 2, etc.")
+        print(f"Molde usado: {mold_used}")
         print(f"Container criado (ainda NÃO publicado): {creation_id}")
         print("Imagens:")
         for url in image_urls:

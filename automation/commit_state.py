@@ -20,7 +20,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     changed = commit_and_push(
         REPO_ROOT,
-        ["automation/state/posted.json"],
+        ["automation/state/posted.json", "automation/state/last_post_format.json"],
         "state: atualiza registro de posts [skip ci]",
     )
     print("Estado atualizado e enviado." if changed else "Nada novo pra comitar.")
