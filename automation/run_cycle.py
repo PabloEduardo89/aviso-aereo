@@ -34,7 +34,7 @@ from fallback_content import build_fallback_post
 from fetch_data import FetchError, fetch_metar, fetch_notam
 from publish import create_container, get_publishing_credentials, host_images_on_github, publish_container
 from rules import evaluate_airport
-from slide import render_post_slides, render_post_slides_classico
+from slide import render_post_slides, render_post_slides_variation
 from state import get_meta, is_posted, load_state, mark_posted, save_state, set_meta
 
 # limite conservador de posts novos por execução (agendada de hora em hora) —
@@ -141,17 +141,20 @@ def run():
             print(f"Aguardando {MIN_INTERVAL_SECONDS}s antes do próximo post (espaçamento entre publicações)...")
             time.sleep(MIN_INTERVAL_SECONDS)
 
-        # molde clássico só entra pra posts REAIS (dados de METAR/NOTAM) — o
-        # educativo de fallback continua sempre no molde único fotográfico
-        # (pedido do usuário, 2026-08-28: a alternância é "uma mini linha de
-        # edição" pros alertas de verdade, não mexe no fallback).
+        # variação de molde só entra pra posts REAIS (dados de METAR/NOTAM) —
+        # o educativo de fallback continua sempre no molde único fotográfico.
+        # style.next_mold já aplica as regras pedidas em 2026-08-28: relevância
+        # alta (severity_tier "alta" — pista/torre fechada, tesoura de vento)
+        # é SEMPRE moderno, sem exceção; fora isso, uma variação só sai depois
+        # de MIN_VARIATION_INTERVAL_SECONDS desde a última — moderno continua
+        # sendo o carro-chefe, a grande maioria do feed.
         is_real = post.icao != "_FALLBACK"
-        mold = style.next_mold(fmt_state) if is_real else "moderno"
+        mold = style.next_mold(post.headline_kind, now, fmt_state) if is_real else "moderno"
 
         print(f"[{post.icao}] publicando ({post.dedup_key}) — molde {mold}")
         try:
-            if mold == "classico":
-                paths = render_post_slides_classico(post, fmt_state)
+            if mold != "moderno":
+                paths = render_post_slides_variation(post, mold, fmt_state)
                 caption = style.apply_caption_opening(post, fmt_state)
             else:
                 paths = render_post_slides(post)

@@ -314,13 +314,20 @@ def render_post_slides(post: PostContent) -> list:
     return paths
 
 
-# ------------------------------------------------------- MOLDE "CLÁSSICO" ---
-# Segundo molde visual pros posts de alerta real (pedido do usuário,
-# 2026-08-28) — duotone vermelho na capa + explicativo em fundo branco
-# (retoma o design pré-2026-08-27), com variações determinísticas amarradas
-# aos dados do evento (ver style.py). Convive com o molde único fotográfico
-# acima ("moderno") — a escolha de qual dos dois usar em cada post é feita
-# por style.next_mold, fora daqui; este módulo não decide isso sozinho.
+# --------------------------------------------------- MOLDES DE VARIAÇÃO ----
+# Moldes visuais alternativos pros posts de alerta real (pedido do usuário,
+# 2026-08-28) — convivem com o molde único fotográfico acima ("moderno", o
+# carro-chefe) sem substituí-lo. A escolha de QUAL molde usar em cada post
+# (incluindo a regra "relevância alta é sempre moderno, sem exceção" e o
+# intervalo mínimo saudável entre variações) é feita por style.next_mold,
+# fora daqui — este módulo só sabe DESENHAR cada molde, não decide quando
+# usá-lo.
+#
+# - "classico": duotone vermelho na capa + explicativo em fundo branco
+#   (retoma o design pré-2026-08-27).
+# - "manchete": foto real em cor cheia (sem duotone), título gigante sobre
+#   faixa escura no terço superior — tratamento tipográfico mais agressivo,
+#   pensado pra prender atenção rápido no feed.
 
 COLOR_CARD_BG_CLASSICO = "#F1F0EC"
 COLOR_LINE_CLASSICO = "#DDDDDD"
@@ -380,13 +387,72 @@ def render_explicativo_classico(ctx: "style.EventContext", accent: str, headline
     return out_path
 
 
-def render_post_slides_classico(post: PostContent, fmt_state: dict) -> list:
-    """Gera os slides do molde clássico pra este post — capa duotone (foto
-    real tratada, cor por style.RED_BY_TIER) sempre, mais o explicativo
-    (fundo branco) só quando há contexto suficiente (ver
-    style.wants_explicativo_slide), e sempre o CTA padrão por último. Muta
-    `fmt_state` em memória (índices das rotações) — quem chama é responsável
-    por persistir (format_state.save), igual ao dedup de state.py."""
+def render_capa_manchete(background_img, credit, accent, kicker_text, title,
+                          out_path: str | None = None) -> str:
+    """Capa do molde 'manchete' — foto real em COR CHEIA (sem duotone, ao
+    contrário do clássico) com faixa escura no terço superior e título bem
+    maior que o do moderno, kicker em texto simples + barra de destaque
+    (não pill) — visualmente distinto dos outros dois moldes de propósito,
+    pra ser reconhecível como uma "edição" diferente à primeira vista."""
+    img = background_img.convert("RGBA")
+    pad = MARGIN
+    max_w = WIDTH - 2 * pad
+
+    probe = ImageDraw.Draw(img)
+    font_title, title_lines = _fit_title(probe, title, "sans_bold", max_w,
+                                          max_lines=3, start_size=92, min_size=50)
+    title_line_h = font_title.size + 14
+    font_kicker = _font("sans_bold", 24)
+
+    scrim_h = 40 + 8 + 18 + (font_kicker.size + 6) + 20 + len(title_lines) * title_line_h + 36
+    scrim_top = int(HEIGHT * 0.30)
+    scrim_top = min(scrim_top, HEIGHT - scrim_h - MARGIN)
+    scrim = Image.new("RGBA", (WIDTH, scrim_h), (0, 0, 0, 0))
+    sdraw = ImageDraw.Draw(scrim)
+    fade = 40
+    for y in range(scrim_h):
+        alpha = int(238 * min(1.0, y / fade))
+        sdraw.line([(0, y), (WIDTH, y)], fill=(0, 0, 0, alpha))
+    img.alpha_composite(scrim, (0, scrim_top))
+
+    draw = ImageDraw.Draw(img, "RGBA")
+    _draw_brand_badge(draw)
+
+    y = scrim_top + 40
+    draw.rectangle([(pad, y), (pad + 72, y + 8)], fill=accent)
+    y += 8 + 18
+
+    draw.text((pad, y), kicker_text, font=font_kicker, fill=accent)
+    y += font_kicker.size + 6 + 20
+
+    for line in title_lines:
+        draw.text((pad, y), line, font=font_title, fill=COLOR_WHITE)
+        y += title_line_h
+
+    if credit:
+        font_credit = _font("sans", 19)
+        draw.text((pad, HEIGHT - MARGIN + 6), f"Foto: {credit}", font=font_credit,
+                   fill=(255, 255, 255, 165), anchor="lb")
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    if out_path is None:
+        out_path = os.path.join(OUTPUT_DIR, "capa_manchete.png")
+    img.convert("RGB").save(out_path, "PNG")
+    return out_path
+
+
+def render_post_slides_variation(post: PostContent, mold: str, fmt_state: dict) -> list:
+    """Gera os slides de um molde de VARIAÇÃO ("classico" ou "manchete") pra
+    este post — capa sempre, explicativo em fundo branco só quando há
+    contexto suficiente (ver style.wants_explicativo_slide, compartilhado
+    pelos dois moldes de variação), CTA padrão por último. Muta `fmt_state`
+    em memória (índices das rotações) — quem chama persiste
+    (format_state.save), igual ao dedup de state.py. Quem decide QUAL molde
+    usar é style.next_mold, sempre chamado ANTES desta função — aqui só
+    desenha."""
+    if mold not in style.VARIATION_MOLDS:
+        raise ValueError(f"molde de variação desconhecido: {mold!r} (esperado um de {style.VARIATION_MOLDS})")
+
     tier = style.severity_tier(post.headline_kind)
     accent = style.RED_BY_TIER[tier]
     badge = style.category_badge(post.headline_kind)
@@ -399,21 +465,22 @@ def render_post_slides_classico(post: PostContent, fmt_state: dict) -> list:
     else:
         bg, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
 
-    if style.is_nighttime(when_dt):
-        bg = ImageEnhance.Brightness(bg).enhance(0.55)
-    bg = duotone(bg, light=_hex_to_rgb(accent))
-
     fmt = style.next_title_format(fmt_state)
-    title = style.title_format_classico(fmt, post.city, post.headline_kind, when_dt)
+    title = style.title_format_variation(fmt, post.city, post.headline_kind, when_dt)
 
     paths = []
-    capa_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_1_capa_classico.png")
-    render_photo_slide(bg, credit, accent, badge, title, out_path=capa_path)
+    capa_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_1_capa_{mold}.png")
+    if mold == "classico":
+        bg_treated = ImageEnhance.Brightness(bg).enhance(0.55) if style.is_nighttime(when_dt) else bg
+        bg_treated = duotone(bg_treated, light=_hex_to_rgb(accent))
+        render_photo_slide(bg_treated, credit, accent, badge, title, out_path=capa_path)
+    else:  # manchete — cor cheia, sem duotone (mesma regra de qualidade de imagem do moderno)
+        render_capa_manchete(bg, credit, accent, badge, title, out_path=capa_path)
     paths.append(capa_path)
 
     ctx = style.extract_event_context(post)
     if style.wants_explicativo_slide(ctx):
-        exp_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_2_explicativo_classico.png")
+        exp_path = os.path.join(OUTPUT_DIR, f"{post.icao}_{_post_slug(post)}_2_explicativo_{mold}.png")
         render_explicativo_classico(ctx, accent, post.headline, out_path=exp_path)
         paths.append(exp_path)
 

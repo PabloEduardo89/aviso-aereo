@@ -17,6 +17,8 @@ STATE_PATH = os.path.join(os.path.dirname(__file__), "state", "last_post_format.
 
 _DEFAULTS = {
     "last_mold": "moderno",
+    "last_variation_at": None,       # ISO datetime da última vez que saiu um molde != moderno
+    "variation_mold_index": -1,      # índice cíclico dentro de style.VARIATION_MOLDS
     "title_format_index": -1,
     "caption_opening_index": -1,
     "image_bank_index": {},

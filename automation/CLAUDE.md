@@ -5,7 +5,53 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
-## Segundo molde visual "clássico" (convive com o molde único) — 2026-08-28
+## Regras de quando cada molde entra: moderno é o carro-chefe (2026-08-28, 2ª passada)
+
+**Revisão da seção abaixo, no mesmo dia**, depois do carrossel manual do
+incidente real em SBRJ (pista fechada por aeronave na pista) ter servido de
+exemplo concreto do que é "notícia de maior relevância". O usuário pediu 3
+ajustes:
+
+1. **"Moderno" precisa ser o carro-chefe** — a maioria do feed, não um
+   rodízio 1-a-1 com as variações.
+2. **Relevância alta é SEMPRE molde moderno, sem exceção** — nunca varia.
+   Aqui "relevância alta" = `style.severity_tier(headline_kind) == "alta"`
+   (pista fechada, torre fechada, tesoura de vento — os únicos 3
+   `headline_kind` nesse nível; ver `_SEVERITY_TIER_BY_KIND`).
+3. **Pelo menos 3 moldes diferentes no total** — adicionado um 3º molde,
+   "manchete" (`slide.render_capa_manchete`): foto real em COR CHEIA (sem
+   duotone, ao contrário do clássico), título bem maior sobre uma faixa
+   escura no terço superior da imagem (não mais no rodapé) e kicker em texto
+   simples + barra de destaque colorida (não mais pill) — visualmente bem
+   diferente tanto do moderno quanto do clássico.
+
+`style.next_mold(headline_kind, now, state)` (mudou de assinatura — antes só
+recebia `state` e alternava estritamente) agora decide assim:
+- `severity_tier(headline_kind) == "alta"` → sempre `"moderno"`, ponto final
+  (não olha nem o intervalo, nem o histórico de rotação).
+- Senão, só libera uma variação (`"classico"` ou `"manchete"`, girando
+  ciclicamente entre os dois — nunca repete o anterior) se já passou
+  `style.MIN_VARIATION_INTERVAL_SECONDS` (hoje 24h) desde a ÚLTIMA variação
+  (`state["last_variation_at"]`) — **não** desde o último post real. Antes
+  desse intervalo passar, mesmo um post de relevância média/baixa cai no
+  moderno. 24h é um valor de partida ("no máximo 1 variação por dia") —
+  ajustar a constante se "saudável" precisar ser outra coisa.
+
+`slide.render_post_slides_classico` foi renomeada/generalizada pra
+`slide.render_post_slides_variation(post, mold, fmt_state)` — recebe o molde
+já decidido (nunca decide sozinha) e despacha pro renderizador de capa certo
+(`render_photo_slide` com fundo duotone pro clássico, `render_capa_manchete`
+pro manchete); o explicativo em fundo branco
+(`render_explicativo_classico`) e o CTA final são compartilhados pelos dois
+moldes de variação. `style.title_format_classico` virou
+`style.title_format_variation` pelo mesmo motivo (usada pelos dois).
+
+`publish.py --stage --mold moderno|classico|manchete` continua existindo
+pra forçar um molde manualmente — diferente do ciclo automático, o override
+manual IGNORA a regra "relevância alta é sempre moderno" de propósito (é uma
+escolha deliberada do operador testando, não a decisão automática).
+
+## Segundo molde visual "clássico" (histórico — ver revisão acima) — 2026-08-28
 
 Pedido do usuário: variação sistemática determinística (nunca sorteio livre
 sem critério) nos posts de alerta real, E um segundo molde visual — "duotone

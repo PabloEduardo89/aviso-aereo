@@ -21,6 +21,7 @@ em momentos separados, com a legenda/imagens já revisadas no meio.
 """
 import os
 import sys
+from datetime import datetime, timezone
 
 import requests
 from dotenv import load_dotenv
@@ -32,7 +33,7 @@ from content import build_post_content
 from fetch_data import FetchError, fetch_metar, fetch_notam
 from git_utils import commit_and_push
 from rules import evaluate_airport
-from slide import render_post_slides, render_post_slides_classico
+from slide import render_post_slides, render_post_slides_variation
 
 load_dotenv()
 
@@ -129,10 +130,13 @@ def stage_post(icao: str, index: int = 0, mold: str | None = None):
     tudo isso sem tornar nada público. Um aeroporto pode ter mais de um post
     relevante ao mesmo tempo (motivos distintos, ver content.py) — `index`
     escolhe qual deles estagear; os outros ficam listados no retorno pra você
-    saber que existem. `mold` força "moderno" ou "classico" (ver style.py);
-    None (padrão) deixa a rotação automática de format_state decidir, igual
-    ao ciclo automático faria. Devolve (creation_id, image_urls, caption,
-    ig_user_id, page_token, total_posts, mold_usado)."""
+    saber que existem. `mold` força um de style.MOLDS (ver style.py) —
+    diferente do ciclo automático, um valor explícito aqui IGNORA a regra
+    "relevância alta é sempre moderno" (é uma escolha manual deliberada, pra
+    testar qualquer molde em qualquer post). None (padrão) deixa
+    style.next_mold decidir sozinho, igual ao ciclo automático faria.
+    Devolve (creation_id, image_urls, caption, ig_user_id, page_token,
+    total_posts, mold_usado)."""
     airport = next((a for a in AIRPORTS if a["code"] == icao), None)
     if airport is None:
         raise PublishError(f"{icao} não está em airports.py")
@@ -155,9 +159,9 @@ def stage_post(icao: str, index: int = 0, mold: str | None = None):
 
     post = posts[index]
     fmt_state = format_state.load()
-    chosen_mold = mold or style.next_mold(fmt_state)
-    if chosen_mold == "classico":
-        paths = render_post_slides_classico(post, fmt_state)
+    chosen_mold = mold or style.next_mold(post.headline_kind, datetime.now(timezone.utc), fmt_state)
+    if chosen_mold != "moderno":
+        paths = render_post_slides_variation(post, chosen_mold, fmt_state)
         caption = style.apply_caption_opening(post, fmt_state)
     else:
         paths = render_post_slides(post)
@@ -176,7 +180,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) < 3 or sys.argv[2] not in ("--stage", "--go"):
         print("Uso:")
-        print("  python publish.py <ICAO> --stage [indice] [--mold moderno|classico]")
+        print("  python publish.py <ICAO> --stage [indice] [--mold moderno|classico|manchete]")
         print("                                              (monta e prepara, não publica;")
         print("                                               sem --mold, a rotação automática decide)")
         print("  python publish.py <ICAO> --go <creation_id> (publica de fato)")

@@ -1,19 +1,42 @@
 """
-Sistema de variação determinística do molde "clássico" (pedido do usuário,
-2026-08-28) — um SEGUNDO molde visual pros posts de alerta real, que convive
-com o molde único fotográfico atual (slide.render_photo_slide, apelidado
-"moderno" aqui) sem substituí-lo. Os dois moldes alternam entre si de post
-em post (ver next_mold) — "uma mini linha de edição", não uma escolha única.
+Sistema de variação determinística do carrossel de posts REAIS (pedido do
+usuário, 2026-08-28, revisado no mesmo dia depois do 1º carrossel de
+incidente real ter mostrado o que "notícia de maior relevância" significa na
+prática). Existem hoje 3 moldes visuais distintos:
 
-Toda variação AQUI DENTRO — categoria de imagem, intensidade do vermelho,
-selo de categoria, quantidade de slides, formato do título, abertura da
-legenda — é uma regra determinística amarrada aos dados reais do evento
-(tipo, gravidade, horário, riqueza de contexto), nunca um sorteio livre.
-O que evita repetir a mesma escolha duas vezes seguidas é um índice cíclico
-persistido em format_state.py (incrementado a cada uso), não random.
+- "moderno" (slide.render_photo_slide) — o CARRO-CHEFE: foto real em cor
+  cheia, degradê escuro na base, kicker em pill. É o padrão — tudo que não
+  é explicitamente uma variação elegível cai aqui.
+- "classico" — duotone vermelho na capa + explicativo em fundo branco
+  (revive o design pré-2026-08-27).
+- "manchete" — foto real em cor cheia (sem duotone) com tratamento
+  tipográfico muito mais agressivo: título gigante sobre uma faixa escura
+  no terço superior, kicker + barra de destaque, pensado pra prender
+  atenção rápido no feed.
 
-Não mexe no molde "moderno" nem nos posts educativos de fallback — este
-módulo só entra em jogo quando o post real escolhido é do molde "clássico".
+Regras de quando cada um entra (`next_mold`), pedidas explicitamente pelo
+usuário em 2026-08-28:
+1. **Relevância alta é sempre molde "moderno", sem exceção** — o exemplo
+   dado foi o carrossel do incidente real em SBRJ (pista fechada por
+   aeronave na pista). Aqui "relevância alta" = `severity_tier == "alta"`
+   (ver mais abaixo: pista/torre fechada, tesoura de vento).
+2. **Intervalo mínimo saudável entre variações** (`MIN_VARIATION_INTERVAL_SECONDS`)
+   — mesmo entre posts de relevância média/baixa (os únicos elegíveis pra
+   variar), uma variação só pode sair depois de passado esse intervalo desde
+   a ÚLTIMA variação (não desde o último post real) — garante que "moderno"
+   continua sendo a esmagadora maioria do feed, não um rodízio 1-a-1.
+3. Quando é hora de variar, o molde escolhido gira ciclicamente entre
+   `VARIATION_MOLDS` (nunca repete o anterior, nunca sorteio).
+
+Toda variação DENTRO de cada molde alternativo — categoria de imagem,
+intensidade do vermelho, selo de categoria, quantidade de slides, formato do
+título, abertura da legenda — também é uma regra determinística amarrada aos
+dados reais do evento (tipo, gravidade, horário, riqueza de contexto), nunca
+sorteio livre. O que evita repetir a mesma escolha duas vezes seguidas é um
+índice cíclico persistido em format_state.py, não random.
+
+Não mexe nos posts educativos de fallback — este módulo só entra em jogo
+pros posts reais (METAR/NOTAM).
 """
 import re
 from dataclasses import dataclass
@@ -21,14 +44,37 @@ from datetime import datetime, timezone
 
 from content import BRT_OFFSET, PostContent, _HEADLINE_LABEL_SENTENCE, _IMPACT_TITLE, _period_of_day
 
-MOLDS = ["moderno", "classico"]
+MODERNO = "moderno"
+VARIATION_MOLDS = ["classico", "manchete"]
+MOLDS = [MODERNO] + VARIATION_MOLDS
+
+# no máximo 1 variação (classico/manchete) a cada 24h corridas — o resto (e
+# TODO post de relevância alta, sem exceção) sai no molde moderno. Ajustar
+# aqui se "saudável" precisar ser mais ou menos frequente.
+MIN_VARIATION_INTERVAL_SECONDS = 24 * 3600
 
 
-# --- molde: alternância estrita post a post, nunca repete o anterior ------
-def next_mold(state: dict) -> str:
-    nxt = "classico" if state.get("last_mold", "moderno") != "classico" else "moderno"
-    state["last_mold"] = nxt
-    return nxt
+def next_mold(headline_kind: str, now: datetime, state: dict) -> str:
+    """Decide o molde do post real: força "moderno" pra relevância alta ou
+    quando a última variação foi recente demais; senão, gira pro próximo
+    molde de VARIATION_MOLDS (nunca repete o anterior)."""
+    if severity_tier(headline_kind) == "alta":
+        state["last_mold"] = MODERNO
+        return MODERNO
+
+    last_variation_at = state.get("last_variation_at")
+    if last_variation_at is not None:
+        elapsed = (now - datetime.fromisoformat(last_variation_at)).total_seconds()
+        if elapsed < MIN_VARIATION_INTERVAL_SECONDS:
+            state["last_mold"] = MODERNO
+            return MODERNO
+
+    idx = (state.get("variation_mold_index", -1) + 1) % len(VARIATION_MOLDS)
+    state["variation_mold_index"] = idx
+    state["last_variation_at"] = now.isoformat()
+    chosen = VARIATION_MOLDS[idx]
+    state["last_mold"] = chosen
+    return chosen
 
 
 # --- 1) categoria de imagem de fundo, condicional ao tipo de evento -------
@@ -167,7 +213,7 @@ def next_title_format(state: dict) -> str:
     return _TITLE_FORMATS[idx]
 
 
-def title_format_classico(fmt: str, city: str, headline_kind: str, when_dt: datetime) -> str:
+def title_format_variation(fmt: str, city: str, headline_kind: str, when_dt: datetime) -> str:
     problema_label = _HEADLINE_LABEL_SENTENCE.get(headline_kind, "Aviso ativo")
     problema_lower = problema_label[0].lower() + problema_label[1:]
     consequencia = _IMPACT_TITLE.get(headline_kind, "Seu voo pode ser afetado")
