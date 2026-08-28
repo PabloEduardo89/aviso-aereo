@@ -25,14 +25,25 @@ MIN_CEILING_FT = 200         # teto (BKN/OVC) abaixo disso: próximo do DH típi
 STRONG_WIND_KT = 25          # vento médio sustentado a partir daqui já preocupa a maioria das operações
 STRONG_GUST_KT = 35          # rajada a partir daqui
 
-# só estes kinds representam risco real de atraso/cancelamento/desvio ("quente") — os
-# demais (visibilidade/teto marginal, vento forte mas não severo, auxílio de navegação
-# fora do ar) são reais mas geralmente contornáveis ("morno") e, a partir de 2026-08-27
-# (pedido do usuário: "não quero mais avisos mornos"), não geram post nenhum — só
-# entram na narrativa quando aparecem JUNTO com um motivo quente (ver evaluate_metar/
-# evaluate_notam, que já filtram por este conjunto antes de devolver as reasons)
+# Kinds que representam risco real de interrupção/atraso em pouso e decolagem —
+# viram post. Histórico:
+#   - 2026-08-27: o usuário pediu "não quero mais avisos mornos" e ficaram de
+#     fora visibilidade/teto/vento (só entravam junto de um motivo "quente").
+#   - 2026-08-28: revisão. A REGRA MAIOR passa a ser: se HÁ um alerta real no
+#     METAR — vento OU não — que pode atrasar/cancelar pouso e decolagem, ele
+#     PRECISA ser publicado. Isso funciona porque evaluate_metar NUNCA gera um
+#     Reason pra dado meramente informativo do METAR (temperatura, QNH, nuvem
+#     normal, variação de vento etc. não viram motivo) — todo Reason que ele
+#     emite já é, por construção, uma condição adversa que cruzou um limiar
+#     operacional. Então praticamente todo kind de METAR entra aqui agora.
+# Continua de fora só `navaid_us` (auxílio de navegação isolado fora do ar):
+# não é alerta de METAR, quase sempre tem aproximação alternativa e não
+# interrompe a operação sozinho — o próprio usuário classificou como
+# "geralmente contornável".
 HIGH_SEVERITY_KINDS = {
-    "rwy_closed", "twr_closed", "windshear", "thunderstorm", "severe_wx", "freezing", "convective", "obscured",
+    "rwy_closed", "twr_closed",
+    "windshear", "thunderstorm", "severe_wx", "freezing", "convective", "obscured",
+    "strong_wind", "low_vis", "low_ceiling",
 }
 
 CLOUD_NAMES = {"FEW": "Poucas nuvens", "SCT": "Nuvens esparsas", "BKN": "Nublado", "OVC": "Encoberto"}
@@ -297,13 +308,16 @@ class AirportEvaluation:
 
 
 def evaluate_airport(icao: str, metar: MetarResult | None, notams: list) -> AirportEvaluation:
-    """Só chega aqui (e vira post) quem tem pelo menos 1 motivo em HIGH_SEVERITY_KINDS
-    — risco real de atraso/cancelamento/desvio ("quente"). Restrição real mas
-    geralmente contornável (visibilidade/teto marginal, vento forte mas não
-    severo, auxílio de navegação fora do ar) NÃO vira post sozinha desde
-    2026-08-27 (pedido do usuário: "não quero mais avisos mornos") — o filtro
-    é aplicado aqui, na origem, pra ninguém rio abaixo (content.py) precisar
-    saber lidar com motivo morno nenhum."""
+    """Só chega aqui (e vira post) quem tem pelo menos 1 motivo em
+    HIGH_SEVERITY_KINDS. Desde a revisão de 2026-08-28 (ver comentário em
+    HIGH_SEVERITY_KINDS), isso cobre TODO alerta real de METAR — vento,
+    visibilidade, teto, fenômeno severo etc.: se o METAR acusa uma condição
+    que cruzou limiar operacional (o que só acontece via evaluate_metar
+    emitindo um Reason), o post sai. O único motivo que continua NÃO gerando
+    post sozinho é `navaid_us` (auxílio de navegação isolado fora do ar, via
+    NOTAM) — quase sempre contornável. O filtro é aplicado aqui, na origem,
+    pra ninguém rio abaixo (content.py) precisar lidar com motivo de baixa
+    relevância."""
     metar_reasons = []
     if metar is not None:
         metar_reasons = [r for r in evaluate_metar(parse_metar(metar.raw)).reasons if r.kind in HIGH_SEVERITY_KINDS]

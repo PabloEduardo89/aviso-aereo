@@ -378,20 +378,43 @@ corrido do explicativo antigo foi condensado em títulos curtos, um por slide.
   `backgrounds.fetch_pexels_photo` devolve `None` e quem chamou cai pro fundo
   "oficial" do post — nunca quebra a geração do slide, só perde a variedade.
 
-## Só avisos "quentes" viram post (regra atualizada 2026-08-27)
+## Todo alerta REAL de METAR vira post (regra revisada 2026-08-28)
+
+**Supera a versão de 2026-08-27** (mantida abaixo por histórico). Em 27/08 o
+usuário tinha cortado visibilidade/teto/vento por achá-los "mornos"; o vento
+forte em Florianópolis não virou post e ele percebeu o buraco. Regra nova, a
+**regra maior**, acima da anterior:
+
+> Se HÁ um alerta real no METAR — vento OU não — que pode **interromper ou
+> atrasar pouso e decolagem**, ele PRECISA ser publicado. Não vale pra dado
+> meramente informativo do METAR (temperatura, QNH, nuvem normal): só pra
+> condição adversa de verdade.
+
+Isso funciona limpo porque `rules.evaluate_metar` **nunca** emite um `Reason`
+pra dado informativo — todo `Reason` que ele devolve já cruzou um limiar
+operacional (`MIN_VISIBILITY_KM` 1.6, `MIN_CEILING_FT` 200, `STRONG_WIND_KT`
+25 / `STRONG_GUST_KT` 35, tesoura de vento, trovoada, CB, congelante…). Então
+`rules.HIGH_SEVERITY_KINDS` passou a incluir `strong_wind`, `low_vis` e
+`low_ceiling` além dos que já tinha — na prática, **todo kind de METAR**.
+
+Único que continua NÃO gerando post sozinho: **`navaid_us`** (auxílio de
+navegação isolado fora do ar, via NOTAM) — não é alerta de METAR, quase
+sempre tem aproximação alternativa, não interrompe a operação sozinho.
+
+Ajuste de limiar: se algum tipo começar a postar demais (ex.: teto de 200 ft
+é comum em alguns aeroportos litorâneos de manhã), a alavanca é subir/descer
+a constante em `rules.py`, não voltar a tirar o kind de `HIGH_SEVERITY_KINDS`.
+`severity` de todo post real segue sempre `"alto"`.
+
+### Histórico — "Só avisos quentes" (regra de 2026-08-27, superada acima)
 
 O usuário revisou o feed e achou muitos avisos "mornos" (restrição real mas
 geralmente contornável — visibilidade/teto marginal, vento forte mas não
 severo, auxílio de navegação fora do ar) — pediu pra só postar risco real de
 atraso/cancelamento/desvio. `rules.HIGH_SEVERITY_KINDS` (antes vivia como
-`content._HIGH_SEVERITY_KINDS`, só definia a COR do post) agora também
-filtra, na origem (`rules.evaluate_airport`), quais `Reason`/`NotamHit`
-sequer chegam a existir na `AirportEvaluation` — motivo fora desse conjunto
-nunca gera post sozinho, mesmo que apareça junto de um motivo quente na
-mesma leitura de METAR (nesse caso, só o motivo quente conta pro post; o
-morno fica de fora das reasons desde a origem). Na prática, `severity` de
-todo post real agora é sempre `"alto"` — `"atenção"` ficou só como valor
-teoricamente possível, não mais alcançável com as regras atuais.
+`content._HIGH_SEVERITY_KINDS`, só definia a COR do post) passou a também
+filtrar, na origem (`rules.evaluate_airport`), quais `Reason`/`NotamHit`
+sequer chegam a existir na `AirportEvaluation`.
 
 ## Referência de estilo: feed do G1 no Instagram (parcialmente superada acima)
 
