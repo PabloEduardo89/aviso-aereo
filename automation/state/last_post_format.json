@@ -1,8 +1,10 @@
 {
-  "caption_opening_index": -1,
-  "image_bank_index": {},
-  "last_mold": "moderno",
-  "last_variation_at": null,
-  "title_format_index": -1,
-  "variation_mold_index": -1
+  "caption_opening_index": 0,
+  "image_bank_index": {
+    "tempestade": 0
+  },
+  "last_mold": "classico",
+  "last_variation_at": "2026-08-28T14:05:23.796303+00:00",
+  "title_format_index": 0,
+  "variation_mold_index": 0
 }
