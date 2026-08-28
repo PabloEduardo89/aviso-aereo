@@ -635,8 +635,29 @@ Dois modos, pra dois momentos diferentes:
   da mesma execução. Importante: o usuário corrigiu explicitamente esse ponto
   em 2026-08-23 — não implementar publicação em lote/paralela de novo.
 - **Onde roda**: GitHub Actions (nuvem), não depende do PC do usuário ligado.
-  Workflow em `.github/workflows/post-avisos.yml`, cron `'0 * * * *'` (de
-  hora em hora) + `workflow_dispatch` pra rodar manualmente pela aba Actions.
+  Workflow em `.github/workflows/post-avisos.yml`, cron `'*/15 * * * *'` (de
+  15 em 15 min) + `workflow_dispatch` pra rodar manualmente pela aba Actions.
+  **Cadência + heartbeat (2026-08-28)**: era `'0 * * * *'`, mas o histórico
+  real (`gh run list`) mostrou o agendador do GitHub entregando só ~2-4
+  execuções/dia — agendas de baixa frequência são as primeiras que ele
+  descarta sob carga. Eventos que começavam e terminavam dentro dessa
+  janela cega (vento forte em FLN, atrasos em CGH/GRU) nunca eram vistos.
+  Correções, todas aditivas (não tocam `run_cycle.py`/`publish.py`):
+  1. cron `*/15`; `concurrency: publicar-avisos-aereos` (`cancel-in-progress:
+     false`) pra uma execução lenta não atropelar a próxima.
+  2. `.github/workflows/heartbeat.yml` (novo) — agenda PRÓPRIA `*/30`
+     (independente: o GitHub limita por workflow), lê a idade da última
+     execução do post-avisos via `gh api`; se passou de `STALE_MINUTES`
+     (45), re-dispara o post-avisos (`gh workflow run`) E abre um issue no
+     repo (o GitHub manda e-mail pro dono em issue nova = alarme sem
+     SMTP). O issue fecha sozinho quando o pipeline volta a rodar no prazo.
+  Repo é público → minutos de Actions ilimitados, `*/15` não custa nada.
+  **Teto que continua existindo**: nada disso deixa o alerta mais rápido
+  que a FONTE — METAR sai ~1x/h, NOTAM às vezes atrasa horas em relação ao
+  fato real (por isso o Santos Dumont precisou de post manual em 27/08).
+  Pra ir além do GitHub (garantia dura de disparo) seria um agendador
+  externo (Cloudflare Worker Cron); não feito porque exige criar conta na
+  hora e o usuário pediu pra não perturbar o que já existe.
 - **Deduplicação** (`state.py`, `state/posted.json`, comitado de volta no
   repo a cada execução): cada post tem um `dedup_key` (`PostContent.dedup_key`
   em content.py) — pra NOTAM é o id do próprio NOTAM (não repete enquanto o

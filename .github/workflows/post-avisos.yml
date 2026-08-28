@@ -2,11 +2,26 @@ name: Publicar avisos aéreos
 
 on:
   schedule:
-    - cron: '0 * * * *'   # a cada hora, no minuto 0 (UTC)
-  workflow_dispatch: {}     # permite rodar manualmente pela aba Actions do GitHub
+    # a cada 15 min (UTC). O agendador do GitHub Actions atrasa/descarta
+    # execuções sob carga — e trata AGENDAS DE BAIXA FREQUÊNCIA (ex.: '0 * * * *')
+    # como as primeiras a cortar. Rodar de 15 em 15 min tem, na prática, cobertura
+    # muito melhor: mesmo perdendo parte das execuções ainda sobra bem mais do que
+    # 1x/hora. O heartbeat.yml (agenda independente) re-dispara este workflow e
+    # avisa por e-mail se ele ficar parado. Nada aqui deixa o alerta mais rápido
+    # que a fonte (METAR ~1x/h, NOTAM com atraso do DECEA) — só garante que o
+    # ciclo REALMENTE roda com frequência.
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}     # roda manualmente pela aba Actions — e é o que o heartbeat.yml re-dispara
 
 permissions:
   contents: write   # precisa pra comitar as imagens/estado de volta no repo
+
+# nunca deixa duas execuções se atropelarem (uma execução que publica 3 posts
+# leva ~12+ min por causa do espaçamento de 6 min entre posts) — a próxima fica
+# na fila em vez de rodar em paralelo e brigar pelo push de estado.
+concurrency:
+  group: publicar-avisos-aereos
+  cancel-in-progress: false
 
 jobs:
   post:

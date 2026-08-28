@@ -1,0 +1,112 @@
+name: Heartbeat da automacao
+
+# Vigia se o post-avisos.yml esta realmente rodando. O agendador do GitHub Actions
+# atrasa/descarta execucao POR WORKFLOW, entao este workflow roda numa AGENDA
+# PROPRIA (*/30), separada da do post-avisos (*/15) — redundancia de verdade, nao
+# so cosmetica. Se a ultima execucao do post-avisos comecou ha mais que
+# STALE_MINUTES, o heartbeat:
+#   1. re-dispara o post-avisos.yml (gh workflow run) — backup de disparo;
+#   2. abre um issue no repo — o GitHub manda e-mail pro dono do repo quando um
+#      issue novo e criado, entao isso vira alarme sem SMTP/servico externo.
+# Quando o pipeline volta a rodar dentro do prazo, o issue e fechado sozinho.
+#
+# NADA aqui deixa o alerta mais rapido que a fonte (METAR ~1x/h, NOTAM com atraso
+# do DECEA) — so garante que o ciclo REALMENTE roda com frequencia, em vez das
+# 2-4x/dia que o cron sozinho estava entregando.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  actions: write     # ler as execucoes do post-avisos e re-dispara-lo
+  issues: write      # abrir/fechar o aviso (e-mail pro dono do repo)
+
+concurrency:
+  group: heartbeat-automacao
+  cancel-in-progress: false
+
+env:
+  STALE_MINUTES: '45'            # */15 normal = 15 min + jitter; 45 = ~3 ciclos perdidos antes de agir
+  ALERT_LABEL: automacao-parada
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.age.outputs.stale }}
+      minutes: ${{ steps.age.outputs.minutes }}
+      last_run: ${{ steps.age.outputs.last_run }}
+    steps:
+      - name: Medir idade da ultima execucao do post-avisos.yml
+        id: age
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          created=$(gh api "repos/${{ github.repository }}/actions/workflows/post-avisos.yml/runs?per_page=1" \
+            --jq '.workflow_runs[0].created_at // empty')
+          if [ -z "$created" ]; then
+            echo "Nenhuma execucao encontrada — tratando como parado."
+            { echo "stale=true"; echo "minutes=9999"; echo "last_run=nunca"; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          minutes=$(( ( $(date -u +%s) - $(date -u -d "$created" +%s) ) / 60 ))
+          echo "Ultima execucao do post-avisos: $created  (${minutes} min atras)"
+          { echo "minutes=${minutes}"; echo "last_run=${created}"; } >> "$GITHUB_OUTPUT"
+          if [ "$minutes" -gt "${STALE_MINUTES}" ]; then
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::post-avisos.yml parado ha ${minutes} min (limite ${STALE_MINUTES})."
+          else
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  act:
+    needs: check
+    if: needs.check.outputs.stale == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MINUTES: ${{ needs.check.outputs.minutes }}
+      LAST_RUN: ${{ needs.check.outputs.last_run }}
+    steps:
+      - name: Re-disparar o pipeline de publicacao
+        run: gh workflow run post-avisos.yml --repo "${{ github.repository }}" --ref "${{ github.ref_name }}"
+
+      - name: Abrir aviso (uma vez) se nao houver nenhum aberto
+        run: |
+          set -euo pipefail
+          open=$(gh issue list --repo "${{ github.repository }}" --label "${ALERT_LABEL}" --state open --json number --jq 'length')
+          if [ "$open" -gt 0 ]; then
+            echo "Ja existe aviso aberto — nao abre outro."
+            exit 0
+          fi
+          gh label create "${ALERT_LABEL}" --repo "${{ github.repository }}" \
+            --color B60205 --description "Automacao de posts ficou sem rodar" 2>/dev/null || true
+          h=$(( MINUTES / 60 )); m=$(( MINUTES % 60 ))
+          printf -v body 'O workflow **post-avisos.yml** nao roda desde `%s` (~%dh%dmin atras; tolerancia: %s min).\n\nO heartbeat ja re-disparou o pipeline nesta execucao. Se este aviso continuar reaparecendo, o agendador do GitHub Actions esta descartando as execucoes de forma persistente — ai vale mover o disparo pra fora do GitHub (Cloudflare Worker Cron / servico externo).\n\nFecha sozinho no proximo heartbeat em que o pipeline tiver rodado dentro do prazo.' \
+            "$LAST_RUN" "$h" "$m" "$STALE_MINUTES"
+          gh issue create --repo "${{ github.repository }}" \
+            --label "${ALERT_LABEL}" \
+            --title "[ALERTA] Automacao de posts parada ha ~${h}h${m}min" \
+            --body "$body"
+
+  clear-alert:
+    needs: check
+    if: needs.check.outputs.stale == 'false'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MINUTES: ${{ needs.check.outputs.minutes }}
+      LAST_RUN: ${{ needs.check.outputs.last_run }}
+    steps:
+      - name: Fechar aviso aberto, se o pipeline voltou a rodar
+        run: |
+          set -euo pipefail
+          nums=$(gh issue list --repo "${{ github.repository }}" --label "${ALERT_LABEL}" --state open --json number --jq '.[].number')
+          for n in $nums; do
+            gh issue comment "$n" --repo "${{ github.repository }}" \
+              --body "Pipeline voltou a rodar (ultima execucao ${LAST_RUN}, ${MINUTES} min atras). Fechando."
+            gh issue close "$n" --repo "${{ github.repository }}"
+          done
