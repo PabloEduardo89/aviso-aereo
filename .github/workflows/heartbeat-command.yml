@@ -1,0 +1,64 @@
+name: Heartbeat — comandos por e-mail
+
+# Deixa o dono do repo agir pelo celular, sem abrir o terminal: basta RESPONDER
+# o e-mail do aviso de "automacao parada" (o GitHub vira isso num comentario no
+# issue) com um comando:
+#   /rodar   -> dispara o post-avisos.yml na hora (workflow_dispatch)
+#   /status  -> comenta no issue as ultimas execucoes do post-avisos
+# Qualquer resposta sem "/" e ignorada em silencio.
+#
+# Roda no evento issue_comment (nao e agendado) -> nao sofre o atraso/descarte
+# que o GitHub aplica a workflows de cron, entao funciona mesmo quando o
+# agendador esta derrubando o post-avisos.
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write     # disparar o post-avisos.yml
+  issues: write       # responder no issue
+
+concurrency:
+  group: heartbeat-command-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  command:
+    # so age em comentario DO DONO DO REPO, num issue ABERTO e rotulado como aviso
+    if: >
+      github.event.issue.state == 'open' &&
+      contains(github.event.issue.labels.*.name, 'automacao-parada') &&
+      github.event.comment.user.login == github.event.repository.owner.login
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BODY: ${{ github.event.comment.body }}
+      ISSUE: ${{ github.event.issue.number }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Interpretar e executar o comando
+        run: |
+          set -euo pipefail
+          cmd=$(printf '%s' "$BODY" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          case "$cmd" in
+            *"/"*) : ;;                       # tem barra -> pode ser comando
+            *) echo "Resposta sem comando — ignorando."; exit 0 ;;
+          esac
+          case "$cmd" in
+            *"/rodar"*|*"/rekick"*|*"/disparar"*)
+              gh workflow run post-avisos.yml --repo "$REPO" --ref "$BRANCH"
+              gh issue comment "$ISSUE" --repo "$REPO" --body "Ok — disparei o **post-avisos.yml** agora (workflow_dispatch). O heartbeat segue re-tentando sozinho a cada 30 min; quando uma execucao entrar no prazo este aviso fecha automatico."
+              ;;
+            *"/status"*|*"/situacao"*)
+              runs=$(gh run list --repo "$REPO" --workflow post-avisos.yml --limit 6 \
+                --json createdAt,status,conclusion,event \
+                --jq '.[] | "- \(.createdAt[0:16])Z · \(.event) · \(.status)/\(.conclusion // "—")"')
+              printf -v msg 'Ultimas execucoes do **post-avisos.yml**:\n%s\n\nAlvo: a cada 15 min. O heartbeat re-dispara se passar de 45 min sem rodar.' "$runs"
+              gh issue comment "$ISSUE" --repo "$REPO" --body "$msg"
+              ;;
+            *)
+              gh issue comment "$ISSUE" --repo "$REPO" --body "Nao reconheci o comando. Responda com **/rodar** (dispara o pipeline agora) ou **/status** (mostra as ultimas execucoes)."
+              ;;
+          esac

@@ -701,6 +701,14 @@ Dois modos, pra dois momentos diferentes:
      (45), re-dispara o post-avisos (`gh workflow run`) E abre um issue no
      repo (o GitHub manda e-mail pro dono em issue nova = alarme sem
      SMTP). O issue fecha sozinho quando o pipeline volta a rodar no prazo.
+     Mitigação é AUTOMÁTICA: mesmo sem ninguém tocar em nada, o heartbeat
+     segue re-disparando a cada 30 min.
+  3. `.github/workflows/heartbeat-command.yml` (novo) — deixa o dono agir
+     pelo celular RESPONDENDO o e-mail do aviso (vira comentário no issue):
+     `/rodar` dispara o post-avisos na hora, `/status` comenta as últimas
+     execuções. Trigger `issue_comment` (não é cron → não sofre o descarte
+     do agendador). Só age em comentário do próprio dono do repo, em issue
+     aberto com o label `automacao-parada`; resposta sem `/` é ignorada.
   Repo é público → minutos de Actions ilimitados, `*/15` não custa nada.
   **Teto que continua existindo**: nada disso deixa o alerta mais rápido
   que a FONTE — METAR sai ~1x/h, NOTAM às vezes atrasa horas em relação ao

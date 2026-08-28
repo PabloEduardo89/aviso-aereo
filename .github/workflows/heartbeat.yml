@@ -85,8 +85,9 @@ jobs:
           gh label create "${ALERT_LABEL}" --repo "${{ github.repository }}" \
             --color B60205 --description "Automacao de posts ficou sem rodar" 2>/dev/null || true
           h=$(( MINUTES / 60 )); m=$(( MINUTES % 60 ))
-          printf -v body 'O workflow **post-avisos.yml** nao roda desde `%s` (~%dh%dmin atras; tolerancia: %s min).\n\nO heartbeat ja re-disparou o pipeline nesta execucao. Se este aviso continuar reaparecendo, o agendador do GitHub Actions esta descartando as execucoes de forma persistente — ai vale mover o disparo pra fora do GitHub (Cloudflare Worker Cron / servico externo).\n\nFecha sozinho no proximo heartbeat em que o pipeline tiver rodado dentro do prazo.' \
-            "$LAST_RUN" "$h" "$m" "$STALE_MINUTES"
+          actions_url="https://github.com/${{ github.repository }}/actions/workflows/post-avisos.yml"
+          printf -v body 'O workflow **post-avisos.yml** nao roda desde `%s` (~%dh%dmin atras; tolerancia: %s min).\n\n**Nao precisa fazer nada** — o heartbeat ja re-disparou o pipeline nesta execucao e continua re-tentando sozinho a cada 30 min ate uma execucao entrar no prazo (ai este aviso fecha automatico).\n\nSe quiser agir agora, pelo celular:\n- **responda este e-mail com `/rodar`** — dispara o pipeline na hora\n- **responda com `/status`** — mostra as ultimas execucoes\n- ou abra %s e toque em **Run workflow**\n\nSe este aviso ficar reaparecendo por horas, o agendador do GitHub esta descartando execucao de forma persistente — ai vale mover o disparo pra fora do GitHub (Cloudflare Worker Cron / servico externo).' \
+            "$LAST_RUN" "$h" "$m" "$STALE_MINUTES" "$actions_url"
           gh issue create --repo "${{ github.repository }}" \
             --label "${ALERT_LABEL}" \
             --title "[ALERTA] Automacao de posts parada ha ~${h}h${m}min" \
