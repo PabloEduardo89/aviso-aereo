@@ -23,7 +23,12 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 import news_images
 import style
-from backgrounds import duotone, fetch_pexels_photo, get_background_for_post
+from backgrounds import (
+    duotone,
+    fetch_pexels_photo,
+    get_background_for_post,
+    get_generic_photo,
+)
 from content import PostContent, SlideSpec
 
 WIDTH, HEIGHT = 1080, 1350

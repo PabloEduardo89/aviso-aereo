@@ -21,6 +21,7 @@ em momentos separados, com a legenda/imagens já revisadas no meio.
 """
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -103,6 +104,44 @@ def _graph_post(path: str, token: str, **params) -> dict:
     return payload
 
 
+def _graph_get(path: str, token: str, **params) -> dict:
+    resp = requests.get(f"{GRAPH_BASE}/{path}", params={**params, "access_token": token}, timeout=30)
+    payload = resp.json()
+    if resp.status_code >= 400 or "error" in payload:
+        raise PublishError(f"Graph API erro em GET {path}: {payload}")
+    return payload
+
+
+# Quanto esperar o container de mídia terminar de processar do lado do Meta
+# antes de publicar. Carrossel de várias imagens costuma levar alguns segundos;
+# chamar /media_publish antes de o container ficar FINISHED devolve o erro
+# 9007 / subcode 2207027 ("A mídia não está pronta para ser publicada") — foi o
+# que derrubou o post de SBPA em 2026-08-29.
+_CONTAINER_READY_TIMEOUT_S = 120
+_CONTAINER_POLL_INTERVAL_S = 5
+
+
+def wait_until_container_ready(token: str, creation_id: str) -> None:
+    """Faz polling de GET /{creation_id}?fields=status_code até o container
+    ficar FINISHED (pronto pra publicar). Levanta PublishError se o Meta
+    devolver ERROR/EXPIRED ou se estourar o timeout."""
+    deadline = time.monotonic() + _CONTAINER_READY_TIMEOUT_S
+    status = None
+    while True:
+        info = _graph_get(creation_id, token, fields="status_code,status")
+        status = info.get("status_code")
+        if status == "FINISHED":
+            return
+        if status in ("ERROR", "EXPIRED"):
+            raise PublishError(
+                f"Container {creation_id} falhou no processamento do Meta: {info}")
+        if time.monotonic() >= deadline:
+            raise PublishError(
+                f"Container {creation_id} não ficou pronto em "
+                f"{_CONTAINER_READY_TIMEOUT_S}s (último status_code: {status})")
+        time.sleep(_CONTAINER_POLL_INTERVAL_S)
+
+
 def create_container(ig_user_id: str, token: str, image_urls: list, caption: str) -> str:
     """Cria o container de mídia (carrossel se houver mais de uma imagem). Não publica nada."""
     if len(image_urls) == 1:
@@ -120,7 +159,10 @@ def create_container(ig_user_id: str, token: str, image_urls: list, caption: str
 
 
 def publish_container(ig_user_id: str, token: str, creation_id: str) -> str:
-    """Publica de fato — este é o passo que vira post público no Instagram."""
+    """Publica de fato — este é o passo que vira post público no Instagram.
+    Espera o container ficar FINISHED antes de publicar, senão o Meta rejeita
+    com "A mídia não está pronta para ser publicada" (9007 / 2207027)."""
+    wait_until_container_ready(token, creation_id)
     result = _graph_post(f"{ig_user_id}/media_publish", token, creation_id=creation_id)
     return result["id"]
 
