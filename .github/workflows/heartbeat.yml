@@ -45,10 +45,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          created=$(gh api "repos/${{ github.repository }}/actions/workflows/post-avisos.yml/runs?per_page=1" \
+          # So conta execucao BEM-SUCEDIDA: um run que comecou e ABORTOU (ex.:
+          # preflight do run_cycle.py falhando por PEXELS_API_KEY invalida) NAO
+          # deve resetar o relogio — senao a degradacao passa despercebida. Com
+          # status=success, um pipeline que so falha mantem o alarme de pe.
+          created=$(gh api "repos/${{ github.repository }}/actions/workflows/post-avisos.yml/runs?per_page=1&status=success" \
             --jq '.workflow_runs[0].created_at // empty')
           if [ -z "$created" ]; then
-            echo "Nenhuma execucao encontrada — tratando como parado."
+            echo "Nenhuma execucao BEM-SUCEDIDA encontrada — tratando como parado."
             { echo "stale=true"; echo "minutes=9999"; echo "last_run=nunca"; } >> "$GITHUB_OUTPUT"
             exit 0
           fi

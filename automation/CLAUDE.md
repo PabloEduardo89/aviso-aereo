@@ -5,6 +5,52 @@ Este arquivo documenta o padrão visual que os slides gerados (`slide.py`,
 retomado — nesta conversa ou em outra — a ideia é que a qualidade visual
 continue subindo em direção a essa referência, em vez de recomeçar do zero.
 
+## CAUSA RAIZ do "slides com imagem repetida/fora do tema" (2026-08-29, 5ª passada)
+
+O usuário reclamou de novo do mesmo problema. Depois de 4 passadas no
+algoritmo de dedup, a causa não era o algoritmo: **o secret
+`PEXELS_API_KEY` estava VAZIO no GitHub Actions** (existia pelo nome, criado
+em 27/08, mas resolvia pra string vazia — no log do job aparecia
+`PEXELS_API_KEY:` em branco enquanto os outros secrets aparecem como `***`).
+
+Consequência: `backgrounds.fetch_pexels_photo` tem `if not PEXELS_API_KEY:
+return None` logo no começo → **todo slide** de **todo carrossel** caía no
+fallback. A biblioteca genérica de reserva só tem 2 fotos → nada inédito →
+entrava o antigo `slide._differentiate` (espelho + brilho da MESMA foto).
+Ou seja, o sistema de "1 foto no-tema por slide" **nunca funcionou em
+produção** desde que foi criado — só funcionava local (o `.env` tem a chave
+certa). Toda a engenharia de dedup era sobre uma fonte de imagem morta.
+
+Correções (2026-08-29):
+
+1. **Secret** — re-setado o `PEXELS_API_KEY` do Actions com o valor do `.env`
+   local (que sempre funcionou: testado, HTTP 200). Isso sozinho já restaura
+   foto própria e no-tema por slide (verificado local: carrossel de 8 slides,
+   8 imagens distintas, cada uma da palavra-chave do seu slide).
+2. **`run_cycle.preflight()`** (novo, roda no 1º passo de `run()`) — valida a
+   `PEXELS_API_KEY` com uma chamada real ao Pexels; se ausente/inválida/API
+   fora, **aborta a execução com `SystemExit`** (job falha) em vez de degradar
+   em silêncio. Nunca mais uma fonte de imagem morta passa semanas
+   despercebida.
+3. **`heartbeat.yml`** — a medição de "idade da última execução" passou a
+   filtrar `?status=success`. Sem isso, um run que ABORTA no preflight ainda
+   resetava o relógio do heartbeat (ele só olhava `created_at`) e o alarme
+   nunca disparava. Agora um pipeline que só falha mantém o alarme de pé (abre
+   issue = e-mail em ≤45 min).
+4. **`slide._resolve_slide_background`** — removido o `_differentiate`
+   (espelho/brilho). Novo fallback quando o Pexels não tem mais foto INÉDITA
+   pra uma palavra-chave (pool esgotado porque 2 slides têm query quase
+   igual): repete a **melhor foto no-tema** (real, coerente com o texto) —
+   decisão do usuário: imagem real e coerente > "nunca repetir". Só se a
+   palavra-chave não devolve NADA no Pexels é que cai pro fundo oficial /
+   genérico.
+
+Pendente (baixa prioridade — com o Pexels no ar essa camada quase nunca é
+usada): a biblioteca genérica de reserva (`assets/photos/generic/`) ainda tem
+só 2 fotos e a categoria `queue` está vazia. Um `fetch` em massa do Pexels
+top-1 por query deu resultado ruim (foto fora de tema, repetida) — precisa de
+curadoria manual (Commons/Pexels escolhendo cada imagem), não script.
+
 ## Garantia dura: nenhum slide repete imagem dentro do carrossel (2026-08-28, 4ª passada)
 
 Pedido do usuário: os carrosséis não podem ter a mesma imagem em slides

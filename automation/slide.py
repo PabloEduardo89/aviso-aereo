@@ -19,7 +19,7 @@ import os
 import random
 from datetime import datetime, timezone
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
 import news_images
 import style
@@ -305,17 +305,6 @@ def _distinct_generic_photo(headline_kind, used_fps: set, max_tries: int = 8):
     return None, None
 
 
-def _differentiate(img: Image.Image, seed: int) -> Image.Image:
-    """Último recurso, quando NÃO há nenhuma imagem real distinta sobrando
-    (Pexels fora do ar E biblioteca genérica esgotada): espelha e ajusta o
-    brilho por um passo dependente de quantas colisões já houve, só pra não
-    sair dois slides pixel a pixel idênticos. Continua sendo uma foto real —
-    não vira duotone/filtro que pareça alerta."""
-    out = ImageOps.mirror(img) if seed % 2 else img
-    factor = 1.0 - 0.08 * ((seed % 3) + 1)   # 0.92, 0.84, 0.76, ...
-    return ImageEnhance.Brightness(out).enhance(factor)
-
-
 def _register(img: Image.Image, credit, used_fps: set):
     used_fps.add(_img_fingerprint(img))
     return img, credit
@@ -333,10 +322,10 @@ def _resolve_slide_background(post: PostContent, slide: SlideSpec,
       aeroporto / satélite / ilustração, ver backgrounds.get_background_for_post).
     - `slide.image_query` preenchido: foto real no Pexels pela palavra-chave
       DAQUELE slide (regra 2026-08-27), com `used_photo_ids` como exclusão dura.
-      Se o Pexels não devolver nada inédito, cai pro fundo oficial / foto
-      genérica — mas só se ainda não tiver sido usado neste carrossel; se já
-      tiver, procura outra foto genérica inédita e, em último caso, aplica uma
-      diferenciação mínima (espelho/brilho) pra não repetir pixel a pixel."""
+      Se o Pexels não tiver mais nada INÉDITO pra essa palavra-chave, repete a
+      melhor foto no-tema (real e coerente com o texto — decisão do usuário
+      2026-08-29, vale mais que "nunca repetir"); só se a palavra-chave não
+      devolver NADA no Pexels é que cai pro fundo oficial / foto genérica."""
     when_dt = post.when_dt or datetime.now(timezone.utc)
 
     if slide.image_query is None:
@@ -349,26 +338,34 @@ def _resolve_slide_background(post: PostContent, slide: SlideSpec,
         img, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
         return _register(img, credit, used_fallback_fps)
 
+    # 1) foto real no Pexels pela palavra-chave DAQUELE slide, inédita no
+    #    carrossel — o caso normal.
     result = fetch_pexels_photo(slide.image_query, exclude_ids=used_photo_ids)
     if result is not None:
         img, credit, photo_id = result
         used_photo_ids.add(photo_id)
         return img, credit
 
-    # Pexels indisponível/sem chave/esgotado pra essa palavra-chave — cai pro
-    # fundo "oficial" do post, mas NUNCA repetido entre slides.
+    # 2) o Pexels não tem mais nenhuma foto INÉDITA pra essa palavra-chave
+    #    (acontece quando dois slides têm palavra-chave quase igual e o pool já
+    #    foi todo usado). Decisão do usuário (2026-08-29): uma foto real e
+    #    COERENTE com o texto do slide vale mais que "nunca repetir" — pega a
+    #    melhor foto no-tema mesmo que já tenha aparecido antes, sem nenhum
+    #    filtro de espelho/brilho artificial (o antigo _differentiate saiu).
+    result = fetch_pexels_photo(slide.image_query, exclude_ids=None)
+    if result is not None:
+        img, credit, photo_id = result
+        used_photo_ids.add(photo_id)
+        return img, credit
+
+    # 3) a palavra-chave não devolve NADA no Pexels (raríssimo — o preflight de
+    #    run_cycle já garante que a API está no ar e autenticada). Sem fonte
+    #    no-tema, cai pro fundo oficial / foto genérica da categoria do aviso.
     img, credit = get_background_for_post(post.icao, post.background_category, post.headline_kind)
-    if _img_fingerprint(img) not in used_fallback_fps:
-        return _register(img, credit, used_fallback_fps)
-
-    alt_img, alt_credit = _distinct_generic_photo(post.headline_kind, used_fallback_fps)
-    if alt_img is not None:
-        return _register(alt_img, alt_credit, used_fallback_fps)
-
-    print(f"[slide] AVISO: sem imagem real distinta pro slide '{slide.image_query}' "
-          f"de {post.dedup_key} — Pexels fora do ar e biblioteca genérica esgotada; "
-          f"aplicando diferenciação mínima pra não repetir a imagem")
-    img = _differentiate(img, len(used_fallback_fps))
+    if _img_fingerprint(img) in used_fallback_fps:
+        alt_img, alt_credit = _distinct_generic_photo(post.headline_kind, used_fallback_fps)
+        if alt_img is not None:
+            return _register(alt_img, alt_credit, used_fallback_fps)
     return _register(img, credit, used_fallback_fps)
 
 

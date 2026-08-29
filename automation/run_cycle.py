@@ -21,9 +21,12 @@ notícia real ou não), agora o relógio só é resetado por um post REAL — se
 seca de notícias reais continuar, o educativo pode voltar a sair na execução
 seguinte, passando pro próximo tópico da rotação a cada vez.
 """
+import os
 import sys
 import time
 from datetime import datetime, timezone
+
+import requests
 
 import format_state
 import style
@@ -54,6 +57,53 @@ MIN_INTERVAL_SECONDS = 360  # 6 minutos
 # educativo) — 6h é mais folgado que os antigos 4h fixos, mas agora reage à
 # seca de notícias de verdade em vez de disparar sempre na mesma cadência.
 MIN_FALLBACK_INTERVAL_SECONDS = 6 * 3600  # 6 horas
+
+
+PEXELS_PREFLIGHT_URL = "https://api.pexels.com/v1/search"
+
+
+def preflight():
+    """Barreira de sanidade antes de QUALQUER publicação: se a fonte de imagem
+    por slide (Pexels) não estiver utilizável, ABORTA a execução com erro (o
+    job do GitHub Actions falha; o heartbeat abre o issue = e-mail pro dono).
+
+    Decidido em 2026-08-29: por semanas o carrossel saiu com a MESMA imagem
+    repetida/espelhada porque o secret PEXELS_API_KEY estava vazio no Actions
+    e `fetch_pexels_photo` degradava em silêncio (retornava None pra todo
+    slide). Agora essa falha é barulhenta e para o pipeline em vez de publicar
+    um post ruim."""
+    key = (os.getenv("PEXELS_API_KEY") or "").strip()
+    if not key:
+        raise SystemExit(
+            "PREFLIGHT FALHOU: PEXELS_API_KEY ausente/vazia. Sem ela, cada slide "
+            "do carrossel cai na mesma imagem de fallback. Configure o secret "
+            "(gh secret set PEXELS_API_KEY --repo PabloEduardo89/aviso-aereo) e "
+            "rode de novo. Nada foi publicado."
+        )
+    try:
+        resp = requests.get(
+            PEXELS_PREFLIGHT_URL,
+            headers={"Authorization": key},
+            params={"query": "airport", "per_page": 1},
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        raise SystemExit(f"PREFLIGHT FALHOU: Pexels inacessível ({exc}). Nada foi publicado.")
+    if resp.status_code == 401:
+        raise SystemExit(
+            "PREFLIGHT FALHOU: PEXELS_API_KEY inválida (HTTP 401 do Pexels). "
+            "Gere uma nova em pexels.com/api e atualize o secret. Nada foi publicado."
+        )
+    try:
+        has_photos = bool(resp.json().get("photos"))
+    except ValueError:
+        has_photos = False
+    if resp.status_code != 200 or not has_photos:
+        raise SystemExit(
+            f"PREFLIGHT FALHOU: Pexels respondeu HTTP {resp.status_code} sem fotos "
+            "utilizáveis. Nada foi publicado."
+        )
+    print("[preflight] Pexels OK — chave válida e API respondendo.")
 
 
 def collect_candidates(state: dict) -> list:
@@ -108,6 +158,7 @@ def maybe_build_fallback(state: dict, now: datetime) -> object | None:
 
 
 def run():
+    preflight()
     state = load_state()
     fmt_state = format_state.load()
     now = datetime.now(timezone.utc)
