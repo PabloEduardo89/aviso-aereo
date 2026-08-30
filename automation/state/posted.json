@@ -171,6 +171,10 @@
     "media_id": "17984845815114126",
     "posted_at": "2026-08-29T13:19:22.926374+00:00"
   },
+  "SBFL|weather|thunderstorm|2026-08-30": {
+    "media_id": "18194302345390740",
+    "posted_at": "2026-08-30T11:04:22.573581+00:00"
+  },
   "SBGL|notam|12315116": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -292,10 +296,10 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 17,
-    "last_fallback_at": "2026-08-29T12:24:10.457727+00:00",
-    "last_post_at": "2026-08-30T00:30:45.606332+00:00",
-    "last_real_post_at": "2026-08-30T00:30:45.606332+00:00"
+    "fallback_topic_index": 18,
+    "last_fallback_at": "2026-08-30T10:57:52.830842+00:00",
+    "last_post_at": "2026-08-30T11:04:22.573581+00:00",
+    "last_real_post_at": "2026-08-30T11:04:22.573581+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
@@ -308,6 +312,10 @@
   "fallback|custo_jatinho|2026-08-26": {
     "media_id": "18144734464553834",
     "posted_at": "2026-08-26T16:21:17.308496+00:00"
+  },
+  "fallback|destinos_jato_particular|2026-08-30": {
+    "media_id": "18079165805370522",
+    "posted_at": "2026-08-30T10:57:52.830842+00:00"
   },
   "fallback|direitos_passageiro|2026-08-24": {
     "media_id": "18141545890602835",
