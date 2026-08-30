@@ -103,6 +103,10 @@
     "media_id": "18053036867795363",
     "posted_at": "2026-08-24T21:33:37.535591+00:00"
   },
+  "SBCF|weather|thunderstorm|2026-08-30": {
+    "media_id": "18122744713812572",
+    "posted_at": "2026-08-30T18:49:12.453779+00:00"
+  },
   "SBCG|notam|12672791": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -207,6 +211,10 @@
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
+  "SBGR|weather|thunderstorm|2026-08-30": {
+    "media_id": "18099496166458545",
+    "posted_at": "2026-08-30T18:42:41.718439+00:00"
+  },
   "SBJP|notam|12468791": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -214,6 +222,10 @@
   "SBJP|notam|12782899": {
     "media_id": "17907674580515940",
     "posted_at": "2026-08-26T16:33:57.604188+00:00"
+  },
+  "SBMQ|weather|convective|2026-08-30": {
+    "media_id": "18008769665763861",
+    "posted_at": "2026-08-30T18:55:44.073628+00:00"
   },
   "SBPA|notam|12418641": {
     "media_id": "skipped_at_launch_no_post",
@@ -306,8 +318,8 @@
   "_meta": {
     "fallback_topic_index": 18,
     "last_fallback_at": "2026-08-30T10:57:52.830842+00:00",
-    "last_post_at": "2026-08-30T15:16:12.412205+00:00",
-    "last_real_post_at": "2026-08-30T15:16:12.412205+00:00"
+    "last_post_at": "2026-08-30T18:55:44.073628+00:00",
+    "last_real_post_at": "2026-08-30T18:55:44.073628+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
