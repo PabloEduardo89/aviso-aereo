@@ -235,6 +235,10 @@
     "media_id": "18082815875700756",
     "posted_at": "2026-08-30T18:57:52.469210+00:00"
   },
+  "SBGR|weather|thunderstorm|2026-08-31": {
+    "media_id": "17955235458233063",
+    "posted_at": "2026-08-31T10:14:35.021519+00:00"
+  },
   "SBJP|notam|12468791": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -339,15 +343,19 @@
     "media_id": "17968837368145998",
     "posted_at": "2026-08-29T13:25:46.649805+00:00"
   },
+  "SBSV|weather|convective|2026-08-31": {
+    "media_id": "18142439443574483",
+    "posted_at": "2026-08-31T10:21:02.435637+00:00"
+  },
   "SBVT|notam|12630272": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 18,
-    "last_fallback_at": "2026-08-30T10:57:52.830842+00:00",
-    "last_post_at": "2026-08-31T03:54:17.717635+00:00",
-    "last_real_post_at": "2026-08-31T03:54:17.717635+00:00"
+    "fallback_topic_index": 19,
+    "last_fallback_at": "2026-08-31T10:08:01.360653+00:00",
+    "last_post_at": "2026-08-31T10:21:02.435637+00:00",
+    "last_real_post_at": "2026-08-31T10:21:02.435637+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
@@ -408,5 +416,9 @@
   "fallback|recordes_jato_executivo|2026-08-27": {
     "media_id": "18486411280105672",
     "posted_at": "2026-08-27T16:16:06.157130+00:00"
+  },
+  "fallback|rotas_exoticas_comerciais|2026-08-31": {
+    "media_id": "18073619675422740",
+    "posted_at": "2026-08-31T10:08:01.360653+00:00"
   }
 }
