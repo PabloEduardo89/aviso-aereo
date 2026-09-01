@@ -143,6 +143,10 @@
     "media_id": "17934530955364304",
     "posted_at": "2026-08-26T04:43:16.585956+00:00"
   },
+  "SBCG|weather|thunderstorm|2026-09-01": {
+    "media_id": "18115672420974123",
+    "posted_at": "2026-09-01T06:47:55.051977+00:00"
+  },
   "SBCG|weather|windshear|2026-08-29": {
     "media_id": "18119157869481282",
     "posted_at": "2026-08-29T17:29:52.815584+00:00"
@@ -258,6 +262,10 @@
   "SBGR|weather|thunderstorm|2026-08-31": {
     "media_id": "17955235458233063",
     "posted_at": "2026-08-31T10:14:35.021519+00:00"
+  },
+  "SBGR|weather|thunderstorm|2026-09-01": {
+    "media_id": "18467262031187699",
+    "posted_at": "2026-09-01T06:41:22.815840+00:00"
   },
   "SBJP|notam|12468791": {
     "media_id": "skipped_at_launch_no_post",
@@ -384,14 +392,18 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 19,
-    "last_fallback_at": "2026-08-31T10:08:01.360653+00:00",
-    "last_post_at": "2026-08-31T23:25:06.600638+00:00",
-    "last_real_post_at": "2026-08-31T23:25:06.600638+00:00"
+    "fallback_topic_index": 20,
+    "last_fallback_at": "2026-09-01T06:34:57.142216+00:00",
+    "last_post_at": "2026-09-01T06:47:55.051977+00:00",
+    "last_real_post_at": "2026-09-01T06:47:55.051977+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
     "posted_at": "2026-08-25T09:39:29.522652+00:00"
+  },
+  "fallback|carreira_piloto|2026-09-01": {
+    "media_id": "17943460794071596",
+    "posted_at": "2026-09-01T06:34:57.142216+00:00"
   },
   "fallback|categorias_jatinhos|2026-08-26": {
     "media_id": "18094204430418406",
