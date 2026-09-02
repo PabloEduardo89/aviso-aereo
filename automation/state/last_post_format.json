@@ -1,10 +1,10 @@
 {
-  "caption_opening_index": 1,
+  "caption_opening_index": 2,
   "image_bank_index": {
-    "tempestade": 1
+    "tempestade": 2
   },
-  "last_mold": "moderno",
-  "last_variation_at": "2026-09-01T22:18:48.021755+00:00",
-  "title_format_index": 1,
-  "variation_mold_index": 0
+  "last_mold": "manchete",
+  "last_variation_at": "2026-09-02T22:32:12.501197+00:00",
+  "title_format_index": 2,
+  "variation_mold_index": 1
 }
