@@ -179,6 +179,10 @@
     "media_id": "18115672420974123",
     "posted_at": "2026-09-01T06:47:55.051977+00:00"
   },
+  "SBCG|weather|thunderstorm|2026-09-05": {
+    "media_id": "18077035829372629",
+    "posted_at": "2026-09-05T14:04:48.496978+00:00"
+  },
   "SBCG|weather|windshear|2026-08-29": {
     "media_id": "18119157869481282",
     "posted_at": "2026-08-29T17:29:52.815584+00:00"
@@ -334,6 +338,10 @@
   "SBGR|notam|12569019": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
+  },
+  "SBGR|weather|convective|2026-09-05": {
+    "media_id": "18034468736837077",
+    "posted_at": "2026-09-05T13:58:16.843702+00:00"
   },
   "SBGR|weather|thunderstorm|2026-08-30": {
     "media_id": "18082815875700756",
@@ -554,8 +562,8 @@
   "_meta": {
     "fallback_topic_index": 4,
     "last_fallback_at": "2026-09-05T07:02:33.504300+00:00",
-    "last_post_at": "2026-09-05T12:07:11.098253+00:00",
-    "last_real_post_at": "2026-09-05T12:07:11.098253+00:00"
+    "last_post_at": "2026-09-05T14:04:48.496978+00:00",
+    "last_real_post_at": "2026-09-05T14:04:48.496978+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
