@@ -1,11 +1,11 @@
 {
-  "caption_opening_index": 2,
+  "caption_opening_index": 0,
   "image_bank_index": {
     "neblina": 0,
-    "tempestade": 1
+    "tempestade": 2
   },
-  "last_mold": "moderno",
-  "last_variation_at": "2026-09-06T09:40:10.449538+00:00",
-  "title_format_index": 2,
-  "variation_mold_index": 0
+  "last_mold": "manchete",
+  "last_variation_at": "2026-09-07T15:58:31.944588+00:00",
+  "title_format_index": 0,
+  "variation_mold_index": 1
 }
