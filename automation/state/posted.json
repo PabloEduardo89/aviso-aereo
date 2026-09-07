@@ -648,9 +648,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 4,
-    "last_fallback_at": "2026-09-05T07:02:33.504300+00:00",
-    "last_post_at": "2026-09-06T22:36:29.146485+00:00",
+    "fallback_topic_index": 5,
+    "last_fallback_at": "2026-09-07T05:03:39.869239+00:00",
+    "last_post_at": "2026-09-07T05:03:39.869239+00:00",
     "last_real_post_at": "2026-09-06T22:36:29.146485+00:00"
   },
   "fallback|bagagem|2026-08-25": {
@@ -716,6 +716,10 @@
   "fallback|matricula_aeronave|2026-08-26": {
     "media_id": "18090362648154124",
     "posted_at": "2026-08-26T01:26:47.953225+00:00"
+  },
+  "fallback|numero_pista|2026-09-07": {
+    "media_id": "17970019254135405",
+    "posted_at": "2026-09-07T05:03:39.869239+00:00"
   },
   "fallback|o_que_e_notam|2026-08-25": {
     "media_id": "18101893658209586",
