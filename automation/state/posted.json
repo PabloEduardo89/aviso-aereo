@@ -664,9 +664,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 6,
-    "last_fallback_at": "2026-09-07T16:00:16.298352+00:00",
-    "last_post_at": "2026-09-07T20:01:34.279490+00:00",
+    "fallback_topic_index": 7,
+    "last_fallback_at": "2026-09-08T05:18:01.607945+00:00",
+    "last_post_at": "2026-09-08T05:18:01.607945+00:00",
     "last_real_post_at": "2026-09-07T20:01:34.279490+00:00"
   },
   "fallback|bagagem|2026-08-25": {
@@ -744,6 +744,10 @@
   "fallback|o_que_e_notam|2026-08-25": {
     "media_id": "18101893658209586",
     "posted_at": "2026-08-25T20:33:01.117861+00:00"
+  },
+  "fallback|o_que_e_notam|2026-09-08": {
+    "media_id": "17970015243152456",
+    "posted_at": "2026-09-08T05:18:01.607945+00:00"
   },
   "fallback|overbooking|2026-08-25": {
     "media_id": "18075165866422222",
