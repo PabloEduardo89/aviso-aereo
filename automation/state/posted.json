@@ -740,9 +740,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 9,
-    "last_fallback_at": "2026-09-09T06:20:24.466461+00:00",
-    "last_post_at": "2026-09-09T23:24:34.111039+00:00",
+    "fallback_topic_index": 10,
+    "last_fallback_at": "2026-09-10T06:14:32.831347+00:00",
+    "last_post_at": "2026-09-10T06:14:32.831347+00:00",
     "last_real_post_at": "2026-09-09T23:24:34.111039+00:00"
   },
   "fallback|bagagem|2026-08-25": {
@@ -764,6 +764,10 @@
   "fallback|categorias_jatinhos|2026-08-26": {
     "media_id": "18094204430418406",
     "posted_at": "2026-08-26T11:33:54.270053+00:00"
+  },
+  "fallback|categorias_jatinhos|2026-09-10": {
+    "media_id": "18110279368850129",
+    "posted_at": "2026-09-10T06:14:32.831347+00:00"
   },
   "fallback|custo_jatinho|2026-08-26": {
     "media_id": "18144734464553834",
