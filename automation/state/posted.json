@@ -175,6 +175,10 @@
     "media_id": "18107000309164386",
     "posted_at": "2026-09-12T23:05:53.420285+00:00"
   },
+  "SBBV|weather|convective|2026-09-13": {
+    "media_id": "18223759750327450",
+    "posted_at": "2026-09-13T06:05:15.681559+00:00"
+  },
   "SBBV|weather|thunderstorm|2026-08-25": {
     "media_id": "18145700698538850",
     "posted_at": "2026-08-25T23:28:00.581599+00:00"
@@ -888,10 +892,10 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 11,
-    "last_fallback_at": "2026-09-12T13:49:08.462470+00:00",
-    "last_post_at": "2026-09-12T23:05:53.420285+00:00",
-    "last_real_post_at": "2026-09-12T23:05:53.420285+00:00"
+    "fallback_topic_index": 12,
+    "last_fallback_at": "2026-09-13T05:58:43.959991+00:00",
+    "last_post_at": "2026-09-13T06:05:15.681559+00:00",
+    "last_real_post_at": "2026-09-13T06:05:15.681559+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
@@ -956,6 +960,10 @@
   "fallback|instalacoes_jatinho|2026-08-26": {
     "media_id": "17878916646527620",
     "posted_at": "2026-08-26T22:53:30+00:00"
+  },
+  "fallback|instalacoes_jatinho|2026-09-13": {
+    "media_id": "18074301524720598",
+    "posted_at": "2026-09-13T05:58:43.959991+00:00"
   },
   "fallback|manutencao_jato_executivo|2026-08-28": {
     "media_id": "18111653846516721",
