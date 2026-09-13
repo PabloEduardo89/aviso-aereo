@@ -896,9 +896,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 12,
-    "last_fallback_at": "2026-09-13T05:58:43.959991+00:00",
-    "last_post_at": "2026-09-13T07:35:07.574594+00:00",
+    "fallback_topic_index": 13,
+    "last_fallback_at": "2026-09-13T14:58:15.973841+00:00",
+    "last_post_at": "2026-09-13T14:58:15.973841+00:00",
     "last_real_post_at": "2026-09-13T07:35:07.574594+00:00"
   },
   "fallback|bagagem|2026-08-25": {
@@ -948,6 +948,10 @@
   "fallback|fretar_vs_comprar_jato|2026-08-27": {
     "media_id": "18088500809424327",
     "posted_at": "2026-08-27T01:48:24.522074+00:00"
+  },
+  "fallback|fretar_vs_comprar_jato|2026-09-13": {
+    "media_id": "17911181436467515",
+    "posted_at": "2026-09-13T14:58:15.973841+00:00"
   },
   "fallback|iata_icao|2026-08-25": {
     "media_id": "17904500691507992",
