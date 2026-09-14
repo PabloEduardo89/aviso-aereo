@@ -807,6 +807,10 @@
     "media_id": "18130669819783319",
     "posted_at": "2026-09-10T21:22:55.652490+00:00"
   },
+  "SBRJ|weather|severe_wx|2026-09-14": {
+    "media_id": "17878034523627501",
+    "posted_at": "2026-09-14T05:28:21.400632+00:00"
+  },
   "SBRJ|weather|thunderstorm|2026-08-29": {
     "media_id": "18113185819985877",
     "posted_at": "2026-08-30T00:30:45.606332+00:00"
@@ -920,10 +924,10 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 13,
-    "last_fallback_at": "2026-09-13T14:58:15.973841+00:00",
-    "last_post_at": "2026-09-13T22:34:39.427120+00:00",
-    "last_real_post_at": "2026-09-13T22:34:39.427120+00:00"
+    "fallback_topic_index": 14,
+    "last_fallback_at": "2026-09-14T05:22:02.023914+00:00",
+    "last_post_at": "2026-09-14T05:28:21.400632+00:00",
+    "last_real_post_at": "2026-09-14T05:28:21.400632+00:00"
   },
   "fallback|bagagem|2026-08-25": {
     "media_id": "18183095581407362",
@@ -1044,6 +1048,10 @@
   "fallback|recordes_jato_executivo|2026-08-27": {
     "media_id": "18486411280105672",
     "posted_at": "2026-08-27T16:16:06.157130+00:00"
+  },
+  "fallback|recordes_jato_executivo|2026-09-14": {
+    "media_id": "18057869432539940",
+    "posted_at": "2026-09-14T05:22:02.023914+00:00"
   },
   "fallback|rotas_exoticas_comerciais|2026-08-31": {
     "media_id": "18073619675422740",
