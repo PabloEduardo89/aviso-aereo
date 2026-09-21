@@ -1232,9 +1232,9 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 20,
-    "last_fallback_at": "2026-09-21T05:13:53.081145+00:00",
-    "last_post_at": "2026-09-21T06:22:04.955759+00:00",
+    "fallback_topic_index": 0,
+    "last_fallback_at": "2026-09-21T13:14:14.018836+00:00",
+    "last_post_at": "2026-09-21T13:14:14.018836+00:00",
     "last_real_post_at": "2026-09-21T06:22:04.955759+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
@@ -1252,6 +1252,10 @@
   "fallback|carreira_comissario_mecanico|2026-09-02": {
     "media_id": "18113908400068897",
     "posted_at": "2026-09-02T09:13:43.074475+00:00"
+  },
+  "fallback|carreira_comissario_mecanico|2026-09-21": {
+    "media_id": "18082005092335512",
+    "posted_at": "2026-09-21T13:14:14.018836+00:00"
   },
   "fallback|carreira_piloto|2026-09-01": {
     "media_id": "17943460794071596",
