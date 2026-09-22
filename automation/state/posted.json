@@ -439,6 +439,10 @@
     "media_id": "18140510497588284",
     "posted_at": "2026-09-05T08:38:58.544584+00:00"
   },
+  "SBCT|notam|13049188": {
+    "media_id": "17891770284436313",
+    "posted_at": "2026-09-22T06:10:35.994209+00:00"
+  },
   "SBCT|weather|convective|2026-08-29": {
     "media_id": "18107279438162720",
     "posted_at": "2026-08-29T17:36:24.261109+00:00"
@@ -1280,10 +1284,10 @@
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 0,
-    "last_fallback_at": "2026-09-21T13:14:14.018836+00:00",
-    "last_post_at": "2026-09-21T23:59:11.050023+00:00",
-    "last_real_post_at": "2026-09-21T23:59:11.050023+00:00"
+    "fallback_topic_index": 1,
+    "last_fallback_at": "2026-09-22T06:03:53.440660+00:00",
+    "last_post_at": "2026-09-22T06:10:35.994209+00:00",
+    "last_real_post_at": "2026-09-22T06:10:35.994209+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
@@ -1344,6 +1348,10 @@
   "fallback|direitos_passageiro|2026-09-02": {
     "media_id": "18129892021589203",
     "posted_at": "2026-09-02T17:40:39.344475+00:00"
+  },
+  "fallback|direitos_passageiro|2026-09-22": {
+    "media_id": "17998601207814037",
+    "posted_at": "2026-09-22T06:03:53.440660+00:00"
   },
   "fallback|fretar_vs_comprar_jato|2026-08-27": {
     "media_id": "18088500809424327",
