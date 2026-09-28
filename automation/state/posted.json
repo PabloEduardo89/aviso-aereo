@@ -1592,9 +1592,9 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 3,
-    "last_fallback_at": "2026-09-24T05:31:21.398877+00:00",
-    "last_post_at": "2026-09-28T06:21:24.157443+00:00",
+    "fallback_topic_index": 4,
+    "last_fallback_at": "2026-09-28T14:21:38.831515+00:00",
+    "last_post_at": "2026-09-28T14:21:38.831515+00:00",
     "last_real_post_at": "2026-09-28T06:21:24.157443+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
@@ -1680,6 +1680,10 @@
   "fallback|iata_icao|2026-09-05": {
     "media_id": "18429608824195941",
     "posted_at": "2026-09-05T07:02:33.504300+00:00"
+  },
+  "fallback|iata_icao|2026-09-28": {
+    "media_id": "17948503638293232",
+    "posted_at": "2026-09-28T14:21:38.831515+00:00"
   },
   "fallback|ilhas_dificeis_chegar|2026-08-29": {
     "media_id": "18164157190483989",
