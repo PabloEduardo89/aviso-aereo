@@ -515,6 +515,10 @@
     "media_id": "17905549278590859",
     "posted_at": "2026-09-29T08:50:33.606066+00:00"
   },
+  "SBCG|weather|convective|2026-09-30": {
+    "media_id": "18031873994891550",
+    "posted_at": "2026-09-30T23:16:37.879152+00:00"
+  },
   "SBCG|weather|low_vis|2026-09-13": {
     "media_id": "18112556495016595",
     "posted_at": "2026-09-13T07:35:07.574594+00:00"
@@ -822,6 +826,10 @@
   "SBEG|weather|thunderstorm|2026-09-29": {
     "media_id": "18075942794425596",
     "posted_at": "2026-09-29T23:59:07.161528+00:00"
+  },
+  "SBEG|weather|thunderstorm|2026-09-30": {
+    "media_id": "18102255032577051",
+    "posted_at": "2026-09-30T23:10:13.884808+00:00"
   },
   "SBFL|notam|12336497": {
     "media_id": "skipped_at_launch_no_post",
@@ -1746,8 +1754,8 @@
   "_meta": {
     "fallback_topic_index": 5,
     "last_fallback_at": "2026-09-30T14:11:47.441075+00:00",
-    "last_post_at": "2026-09-30T21:10:07.621287+00:00",
-    "last_real_post_at": "2026-09-30T21:10:07.621287+00:00"
+    "last_post_at": "2026-09-30T23:16:37.879152+00:00",
+    "last_real_post_at": "2026-09-30T23:16:37.879152+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
