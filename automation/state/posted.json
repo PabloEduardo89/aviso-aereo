@@ -1875,6 +1875,10 @@
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
+  "SBVT|weather|severe_wx|2026-10-03": {
+    "media_id": "18128992621838372",
+    "posted_at": "2026-10-03T12:15:43.456790+00:00"
+  },
   "SBVT|weather|windshear|2026-09-22": {
     "media_id": "18144383848570430",
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
@@ -1882,8 +1886,8 @@
   "_meta": {
     "fallback_topic_index": 8,
     "last_fallback_at": "2026-10-03T06:53:41.365341+00:00",
-    "last_post_at": "2026-10-03T06:53:41.365341+00:00",
-    "last_real_post_at": "2026-10-02T23:56:02.005173+00:00"
+    "last_post_at": "2026-10-03T12:15:43.456790+00:00",
+    "last_real_post_at": "2026-10-03T12:15:43.456790+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
