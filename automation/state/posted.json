@@ -1880,9 +1880,9 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 7,
-    "last_fallback_at": "2026-10-02T13:15:08.661479+00:00",
-    "last_post_at": "2026-10-02T23:56:02.005173+00:00",
+    "fallback_topic_index": 8,
+    "last_fallback_at": "2026-10-03T06:53:41.365341+00:00",
+    "last_post_at": "2026-10-03T06:53:41.365341+00:00",
     "last_real_post_at": "2026-10-02T23:56:02.005173+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
@@ -2004,6 +2004,10 @@
   "fallback|matricula_aeronave|2026-09-08": {
     "media_id": "17986852329060394",
     "posted_at": "2026-09-08T18:13:25.953815+00:00"
+  },
+  "fallback|matricula_aeronave|2026-10-03": {
+    "media_id": "18112732037519820",
+    "posted_at": "2026-10-03T06:53:41.365341+00:00"
   },
   "fallback|numero_pista|2026-09-07": {
     "media_id": "17970019254135405",
