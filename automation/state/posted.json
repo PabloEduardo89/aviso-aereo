@@ -1023,6 +1023,10 @@
     "media_id": "18111620069587271",
     "posted_at": "2026-09-29T15:17:10.778384+00:00"
   },
+  "SBFZ|notam|13093941": {
+    "media_id": "18115390541089835",
+    "posted_at": "2026-10-06T13:57:31.379819+00:00"
+  },
   "SBFZ|weather|convective|2026-08-31": {
     "media_id": "18146245396550378",
     "posted_at": "2026-08-31T12:13:41.628860+00:00"
@@ -2056,10 +2060,10 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 11,
-    "last_fallback_at": "2026-10-06T06:46:49.903936+00:00",
-    "last_post_at": "2026-10-06T07:32:18.081561+00:00",
-    "last_real_post_at": "2026-10-06T07:32:18.081561+00:00"
+    "fallback_topic_index": 12,
+    "last_fallback_at": "2026-10-06T13:50:52.214520+00:00",
+    "last_post_at": "2026-10-06T13:57:31.379819+00:00",
+    "last_real_post_at": "2026-10-06T13:57:31.379819+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
@@ -2172,6 +2176,10 @@
   "fallback|instalacoes_jatinho|2026-09-13": {
     "media_id": "18074301524720598",
     "posted_at": "2026-09-13T05:58:43.959991+00:00"
+  },
+  "fallback|instalacoes_jatinho|2026-10-06": {
+    "media_id": "18137725813631267",
+    "posted_at": "2026-10-06T13:50:52.214520+00:00"
   },
   "fallback|manutencao_jato_executivo|2026-08-28": {
     "media_id": "18111653846516721",
