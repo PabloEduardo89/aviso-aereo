@@ -2104,9 +2104,9 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 13,
-    "last_fallback_at": "2026-10-07T09:36:15.416940+00:00",
-    "last_post_at": "2026-10-07T09:49:37.175933+00:00",
+    "fallback_topic_index": 14,
+    "last_fallback_at": "2026-10-07T17:08:55.603993+00:00",
+    "last_post_at": "2026-10-07T17:08:55.603993+00:00",
     "last_real_post_at": "2026-10-07T09:49:37.175933+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
@@ -2308,6 +2308,10 @@
   "fallback|recordes_jato_executivo|2026-09-14": {
     "media_id": "18057869432539940",
     "posted_at": "2026-09-14T05:22:02.023914+00:00"
+  },
+  "fallback|recordes_jato_executivo|2026-10-07": {
+    "media_id": "17919204753244196",
+    "posted_at": "2026-10-07T17:08:55.603993+00:00"
   },
   "fallback|rotas_exoticas_comerciais|2026-08-31": {
     "media_id": "18073619675422740",
