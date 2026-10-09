@@ -2160,9 +2160,9 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 17,
-    "last_fallback_at": "2026-10-09T07:19:49.011399+00:00",
-    "last_post_at": "2026-10-09T08:14:25.530175+00:00",
+    "fallback_topic_index": 18,
+    "last_fallback_at": "2026-10-09T14:33:06.550213+00:00",
+    "last_post_at": "2026-10-09T14:33:06.550213+00:00",
     "last_real_post_at": "2026-10-09T08:14:25.530175+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
@@ -2232,6 +2232,10 @@
   "fallback|destinos_jato_particular|2026-09-19": {
     "media_id": "18202325605372169",
     "posted_at": "2026-09-19T12:02:51.293370+00:00"
+  },
+  "fallback|destinos_jato_particular|2026-10-09": {
+    "media_id": "18342026014253911",
+    "posted_at": "2026-10-09T14:33:06.550213+00:00"
   },
   "fallback|direitos_passageiro|2026-08-24": {
     "media_id": "18141545890602835",
