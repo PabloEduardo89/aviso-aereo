@@ -2196,9 +2196,9 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 18,
-    "last_fallback_at": "2026-10-09T14:33:06.550213+00:00",
-    "last_post_at": "2026-10-10T09:26:46.410610+00:00",
+    "fallback_topic_index": 19,
+    "last_fallback_at": "2026-10-10T15:33:39.568033+00:00",
+    "last_post_at": "2026-10-10T15:33:39.568033+00:00",
     "last_real_post_at": "2026-10-10T09:26:46.410610+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
@@ -2428,5 +2428,9 @@
   "fallback|rotas_exoticas_comerciais|2026-09-20": {
     "media_id": "18110258441169210",
     "posted_at": "2026-09-20T05:35:43.327531+00:00"
+  },
+  "fallback|rotas_exoticas_comerciais|2026-10-10": {
+    "media_id": "17910986016540665",
+    "posted_at": "2026-10-10T15:33:39.568033+00:00"
   }
 }
