@@ -723,6 +723,10 @@
     "media_id": "18220795255342228",
     "posted_at": "2026-10-10T06:10:24.656155+00:00"
   },
+  "SBCG|weather|thunderstorm|2026-10-11": {
+    "media_id": "18118936048933878",
+    "posted_at": "2026-10-11T23:10:53.679893+00:00"
+  },
   "SBCG|weather|windshear|2026-08-29": {
     "media_id": "18119157869481282",
     "posted_at": "2026-08-29T17:29:52.815584+00:00"
@@ -1407,6 +1411,10 @@
     "media_id": "18106299590528664",
     "posted_at": "2026-10-10T22:59:04.192833+00:00"
   },
+  "SBGR|weather|thunderstorm|2026-10-11": {
+    "media_id": "18444580717132139",
+    "posted_at": "2026-10-11T22:57:48.841256+00:00"
+  },
   "SBGR|weather|windshear|2026-09-10": {
     "media_id": "18074788556478519",
     "posted_at": "2026-09-10T15:12:27.286859+00:00"
@@ -1590,6 +1598,10 @@
   "SBMQ|weather|thunderstorm|2026-10-01": {
     "media_id": "18095744132439505",
     "posted_at": "2026-10-01T23:26:26.499008+00:00"
+  },
+  "SBMQ|weather|thunderstorm|2026-10-11": {
+    "media_id": "18336638617262728",
+    "posted_at": "2026-10-11T23:04:21.507963+00:00"
   },
   "SBPA|notam|12418641": {
     "media_id": "skipped_at_launch_no_post",
@@ -2286,8 +2298,8 @@
   "_meta": {
     "fallback_topic_index": 20,
     "last_fallback_at": "2026-10-11T07:57:22.492148+00:00",
-    "last_post_at": "2026-10-11T20:52:52.459213+00:00",
-    "last_real_post_at": "2026-10-11T20:52:52.459213+00:00"
+    "last_post_at": "2026-10-11T23:10:53.679893+00:00",
+    "last_real_post_at": "2026-10-11T23:10:53.679893+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
