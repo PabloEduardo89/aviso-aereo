@@ -1971,6 +1971,10 @@
     "media_id": "18231962053322998",
     "posted_at": "2026-10-11T19:20:19.608319+00:00"
   },
+  "SBRB|weather|convective|2026-10-12": {
+    "media_id": "18100675526561134",
+    "posted_at": "2026-10-12T15:59:52.056717+00:00"
+  },
   "SBRB|weather|severe_wx|2026-09-20": {
     "media_id": "18113546795121028",
     "posted_at": "2026-09-20T22:18:23.197662+00:00"
@@ -2320,10 +2324,10 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 20,
-    "last_fallback_at": "2026-10-11T07:57:22.492148+00:00",
-    "last_post_at": "2026-10-12T09:27:32.106602+00:00",
-    "last_real_post_at": "2026-10-12T09:27:32.106602+00:00"
+    "fallback_topic_index": 0,
+    "last_fallback_at": "2026-10-12T15:53:19.981167+00:00",
+    "last_post_at": "2026-10-12T15:59:52.056717+00:00",
+    "last_real_post_at": "2026-10-12T15:59:52.056717+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
@@ -2352,6 +2356,10 @@
   "fallback|carreira_comissario_mecanico|2026-09-21": {
     "media_id": "18082005092335512",
     "posted_at": "2026-09-21T13:14:14.018836+00:00"
+  },
+  "fallback|carreira_comissario_mecanico|2026-10-12": {
+    "media_id": "18100650293312783",
+    "posted_at": "2026-10-12T15:53:19.981167+00:00"
   },
   "fallback|carreira_piloto|2026-09-01": {
     "media_id": "17943460794071596",
