@@ -1583,6 +1583,10 @@
     "media_id": "18179704099431515",
     "posted_at": "2026-10-14T19:27:42.730452+00:00"
   },
+  "SBGR|weather|thunderstorm|2026-10-16": {
+    "media_id": "17963231625218571",
+    "posted_at": "2026-10-16T06:44:09.416865+00:00"
+  },
   "SBGR|weather|windshear|2026-09-10": {
     "media_id": "18074788556478519",
     "posted_at": "2026-09-10T15:12:27.286859+00:00"
@@ -2335,6 +2339,10 @@
     "media_id": "17964554841206624",
     "posted_at": "2026-10-10T23:05:32.762009+00:00"
   },
+  "SBRJ|weather|thunderstorm|2026-10-16": {
+    "media_id": "17982658746094080",
+    "posted_at": "2026-10-16T06:50:43.409142+00:00"
+  },
   "SBSG|notam|12754168": {
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
@@ -2552,10 +2560,10 @@
     "posted_at": "2026-09-22T20:28:00.354848+00:00"
   },
   "_meta": {
-    "fallback_topic_index": 0,
-    "last_fallback_at": "2026-10-12T15:53:19.981167+00:00",
-    "last_post_at": "2026-10-15T23:28:56.596050+00:00",
-    "last_real_post_at": "2026-10-15T23:28:56.596050+00:00"
+    "fallback_topic_index": 1,
+    "last_fallback_at": "2026-10-16T06:37:45.914600+00:00",
+    "last_post_at": "2026-10-16T06:50:43.409142+00:00",
+    "last_real_post_at": "2026-10-16T06:50:43.409142+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
@@ -2648,6 +2656,10 @@
   "fallback|direitos_passageiro|2026-09-22": {
     "media_id": "17998601207814037",
     "posted_at": "2026-09-22T06:03:53.440660+00:00"
+  },
+  "fallback|direitos_passageiro|2026-10-16": {
+    "media_id": "17914726230496997",
+    "posted_at": "2026-10-16T06:37:45.914600+00:00"
   },
   "fallback|fretar_vs_comprar_jato|2026-08-27": {
     "media_id": "18088500809424327",
