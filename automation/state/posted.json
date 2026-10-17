@@ -1855,6 +1855,10 @@
     "media_id": "skipped_at_launch_no_post",
     "posted_at": "2026-08-23T22:29:00.794814+00:00"
   },
+  "SBPA|notam|13195883": {
+    "media_id": "17991589368069232",
+    "posted_at": "2026-10-17T05:14:46.578491+00:00"
+  },
   "SBPA|weather|convective|2026-09-03": {
     "media_id": "18136780219658114",
     "posted_at": "2026-09-04T00:34:27.509354+00:00"
@@ -2646,8 +2650,8 @@
   "_meta": {
     "fallback_topic_index": 1,
     "last_fallback_at": "2026-10-16T06:37:45.914600+00:00",
-    "last_post_at": "2026-10-17T03:03:08.525660+00:00",
-    "last_real_post_at": "2026-10-17T03:03:08.525660+00:00"
+    "last_post_at": "2026-10-17T05:14:46.578491+00:00",
+    "last_real_post_at": "2026-10-17T05:14:46.578491+00:00"
   },
   "fallback|aeroportos_mais_dificeis|2026-09-16": {
     "media_id": "18220948795337245",
